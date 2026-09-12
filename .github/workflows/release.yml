@@ -54,13 +54,9 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     permissions:
-      # Creating the release and uploading its artifacts.
-      contents: write
-      # Cosign keyless signing: exchanged for a short-lived Sigstore
-      # certificate, never a long-lived key.
-      id-token: write
-      # Recording build provenance for the source archive.
-      attestations: write
+      contents: write  # create the release and upload its artifacts
+      id-token: write  # cosign keyless: exchanged for a short-lived Sigstore certificate, never a stored key
+      attestations: write  # record build provenance for the source archive
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

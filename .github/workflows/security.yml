@@ -12,6 +12,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   govulncheck:
     name: govulncheck
@@ -38,10 +42,8 @@ jobs:
     name: codeql
     runs-on: ubuntu-latest
     permissions:
-      # Uploading the CodeQL SARIF to the security tab.
-      security-events: write
-      # CodeQL reads workflow runs to attribute findings to a commit.
-      actions: read
+      security-events: write  # upload the CodeQL SARIF to the security tab
+      actions: read  # CodeQL reads workflow runs to attribute findings to a commit
       contents: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -68,13 +70,10 @@ jobs:
     # a pull request from a fork cannot change it.
     if: github.event_name != 'pull_request'
     permissions:
-      # Uploading the Scorecard SARIF to the security tab.
-      security-events: write
-      # Signing the published result so scorecard.dev can attribute it here.
-      id-token: write
+      security-events: write  # upload the Scorecard SARIF to the security tab
+      id-token: write  # sign the published result so scorecard.dev can attribute it here
       contents: read
-      # Scorecard inspects workflow runs to score CI practices.
-      actions: read
+      actions: read  # Scorecard inspects workflow runs to score CI practices
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

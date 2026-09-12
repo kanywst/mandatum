@@ -46,13 +46,9 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-      # Posting the summary and the inline findings.
-      pull-requests: write
-      # The delivery check reads the pull request's conversation comments,
-      # which GitHub serves from the issues endpoint.
-      issues: read
-      # Required by the action's default GitHub App authentication.
-      id-token: write
+      pull-requests: write  # post the summary and the inline findings
+      issues: read  # the delivery check reads conversation comments, served from the issues endpoint
+      id-token: write  # required by the action's default GitHub App authentication
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
