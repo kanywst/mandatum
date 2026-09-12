@@ -22,7 +22,20 @@ func request() authzen.Request {
 	}
 }
 
+// clientFor wraps the handler so that it echoes X-Request-ID, which a
+// conformant PDP must do. Tests that care about a missing echo use
+// rawClientFor and omit it deliberately.
 func clientFor(t *testing.T, h http.HandlerFunc, opts ...authzen.Option) *authzen.Client {
+	t.Helper()
+	return rawClientFor(t, func(w http.ResponseWriter, r *http.Request) {
+		if id := r.Header.Get("X-Request-ID"); id != "" {
+			w.Header().Set("X-Request-ID", id)
+		}
+		h(w, r)
+	}, opts...)
+}
+
+func rawClientFor(t *testing.T, h http.HandlerFunc, opts ...authzen.Option) *authzen.Client {
 	t.Helper()
 	srv := httptest.NewServer(h)
 	t.Cleanup(srv.Close)
@@ -161,6 +174,47 @@ func TestEverythingThatCanGoWrongDenies(t *testing.T) {
 				t.Errorf("error %q does not mention %q", err, tt.want)
 			}
 		})
+	}
+}
+
+// A PDP that omits the echo has not established that its answer belongs to
+// this question, which is the same thing a mismatch means. Denying only on a
+// mismatch would let a cache or a proxy defeat the check by dropping one
+// header, so both are denials.
+func TestAMissingRequestIDEchoDenies(t *testing.T) {
+	c := rawClientFor(t, func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{"decision":true}`))
+	})
+
+	d, err := c.Evaluate(context.Background(), request())
+	if err == nil {
+		t.Fatal("accepted a decision that could not be tied to the request")
+	}
+	if d.Allowed {
+		t.Fatal("the returned Decision allowed")
+	}
+	if !strings.Contains(err.Error(), "cannot be tied to this request") {
+		t.Errorf("unexpected reason: %v", err)
+	}
+}
+
+// Sending no identifier is the explicit way to work with a PDP that does not
+// echo. It is visible at the call site, unlike a client that quietly accepts
+// uncorrelated answers.
+func TestNoRequestIDMeansNoCorrelationCheck(t *testing.T) {
+	c := rawClientFor(t, func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("X-Request-ID"); got != "" {
+			t.Errorf("sent X-Request-ID %q despite an empty generator", got)
+		}
+		_, _ = w.Write([]byte(`{"decision":true}`))
+	}, authzen.WithRequestID(func() string { return "" }))
+
+	d, err := c.Evaluate(context.Background(), request())
+	if err != nil {
+		t.Fatalf("Evaluate: %v", err)
+	}
+	if !d.Allowed {
+		t.Error("denied an allow response")
 	}
 }
 

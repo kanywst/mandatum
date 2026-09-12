@@ -113,4 +113,4 @@ Issue と Pull Request は日本語で書いても構いません。ただしコ
 
 ---
 
-*翻訳元: `c4fc3d2`*
+*translated-from: sha-256:6ee8b68d41dd7e6e21bc11046c19950c008a6d432ea3f57d2bf4d35758fa17a2*

@@ -196,12 +196,22 @@ func (c *Client) Evaluate(ctx context.Context, r Request) (Decision, error) {
 		}
 	}
 
-	// The PDP MUST echo the request identifier. A mismatch means the answer
-	// may belong to a different question, which cannot be enforced on.
-	if echoed := resp.Header.Get("X-Request-ID"); requestID != "" && echoed != "" && echoed != requestID {
-		return Deny, fmt.Errorf(
-			"authzen: response carries request id %q, expected %q; this answer may belong to another request",
-			echoed, requestID)
+	// The PDP MUST echo the request identifier when the PEP sends one. A
+	// mismatch means the answer may belong to a different question; a
+	// missing echo means the same thing, since correlation was never
+	// established. Accepting the second while denying the first would let a
+	// cache or proxy defeat the check by dropping one header.
+	if requestID != "" {
+		switch echoed := resp.Header.Get("X-Request-ID"); {
+		case echoed == "":
+			return Deny, fmt.Errorf(
+				"authzen: response carries no request id, expected %q; "+
+					"this answer cannot be tied to this request", requestID)
+		case echoed != requestID:
+			return Deny, fmt.Errorf(
+				"authzen: response carries request id %q, expected %q; "+
+					"this answer may belong to another request", echoed, requestID)
+		}
 	}
 
 	var d Decision

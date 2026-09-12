@@ -331,4 +331,4 @@ OIDF の COAZ-MCP バインディング（WG Draft, 2026年6月）が MCP ツー
 
 ---
 
-*翻訳元: `c4fc3d2`*
+*translated-from: sha-256:1c370b1e5689844f5533a3aecc6c90114a8ef646abe8c3906d4ed78dfe5ac6bd*
