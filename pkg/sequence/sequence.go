@@ -199,10 +199,6 @@ func matches(m mda.ActionMatcher, a Action) bool {
 	return true
 }
 
-func isEmpty(m mda.ActionMatcher) bool {
-	return m.Action == "" && m.ResourceType == "" && len(m.ResourceTags) == 0
-}
-
 func describe(m mda.ActionMatcher) string {
 	switch {
 	case len(m.ResourceTags) > 0:
@@ -218,13 +214,14 @@ func describe(m mda.ActionMatcher) string {
 
 // Validate reports whether a sequence compiles to a bounded automaton.
 //
-// mda.Claims.Validate performs the same checks during issuance and chain
-// verification. They are repeated here because this is a public entry point
-// and an evaluator must not depend on someone else having validated first:
-// an assertion reaching a verifier may have been issued by something that
-// did not check. Constraints that cannot compile are refused rather than
-// approximated, because a constraint evaluated loosely is one an operator
-// believes in and does not have.
+// mda.Claims.Validate applies the same rules during issuance and chain
+// verification, using the same ActionMatcher.MatchesEverything so the two
+// cannot disagree about what an empty trigger is. They are repeated here
+// because this is a public entry point and an evaluator must not depend on
+// someone else having validated first: an assertion reaching a verifier may
+// have been issued by something that did not check. Constraints that cannot
+// compile are refused rather than approximated, because a constraint
+// evaluated loosely is one an operator believes in and does not have.
 func Validate(seq *mda.Sequence) error {
 	if seq == nil {
 		return nil
@@ -254,7 +251,7 @@ func Validate(seq *mda.Sequence) error {
 		// which is what whoever wrote it meant. An unconditional prohibition
 		// belongs in the capability set, where it applies from the start and
 		// attenuates down the chain like everything else.
-		if isEmpty(c.After) {
+		if c.After.MatchesEverything() {
 			return fmt.Errorf(
 				"sequence: constraint %q has an empty trigger; a sequence rule fires after something, "+
 					"so this would take effect from the second action, not the first. "+

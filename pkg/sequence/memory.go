@@ -3,6 +3,7 @@ package sequence
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
 	"sync"
 )
@@ -15,14 +16,38 @@ import (
 // PEPs with separate memories give an agent two histories to spend. Use a
 // replicated store there.
 //
-// The zero value is ready to use.
+// Entries are not evicted on a timer. Dropping a live chain's history resets
+// the constraints it is under, which widens authority, so expiry is the
+// caller's decision through Forget — usually when the chain's root assertion
+// expires or is revoked. What the store does instead is refuse to grow past
+// MaxRoots, because a process that runs out of memory stops enforcing
+// entirely.
+//
+// The zero value is ready to use and applies DefaultMaxRoots.
 type MemoryStore struct {
+	// MaxRoots caps how many chain roots are tracked. Zero applies
+	// DefaultMaxRoots; a negative value removes the cap, which is a choice
+	// to make deliberately and not a default.
+	MaxRoots int
+
 	mu     sync.Mutex
 	states map[string]State
 }
 
-// NewMemoryStore returns an empty store.
+// DefaultMaxRoots bounds a store whose MaxRoots is unset. It is generous
+// enough not to be hit by a normal deployment and small enough that an
+// enforcement point cannot be exhausted by minting chains.
+const DefaultMaxRoots = 100_000
+
+// NewMemoryStore returns an empty store with the default cap.
 func NewMemoryStore() *MemoryStore { return &MemoryStore{} }
+
+// Len reports how many chain roots are tracked.
+func (m *MemoryStore) Len() int {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return len(m.states)
+}
 
 // Update applies fn to the state for root under a lock, so two agents acting
 // at once under one chain cannot both read the state before either writes.
@@ -39,6 +64,17 @@ func (m *MemoryStore) Update(ctx context.Context, root string, fn func(State) (S
 		m.states = map[string]State{}
 	}
 
+	// Refuse rather than evict. Evicting a live chain would clear the
+	// triggers it is under, so the cheapest way past a constraint would be
+	// to fill the store.
+	if _, known := m.states[root]; !known {
+		if limit := m.maxRoots(); limit > 0 && len(m.states) >= limit {
+			return fmt.Errorf(
+				"sequence: the history store is holding %d chain roots, its limit; "+
+					"call Forget for chains that have expired, or raise MaxRoots", limit)
+		}
+	}
+
 	next, err := fn(m.states[root])
 	if err != nil {
 		// Nothing is persisted on a denial. A refused action did not happen,
@@ -47,6 +83,13 @@ func (m *MemoryStore) Update(ctx context.Context, root string, fn func(State) (S
 	}
 	m.states[root] = next
 	return nil
+}
+
+func (m *MemoryStore) maxRoots() int {
+	if m.MaxRoots == 0 {
+		return DefaultMaxRoots
+	}
+	return m.MaxRoots
 }
 
 // Get returns the state for a chain root, for inspection and tests.

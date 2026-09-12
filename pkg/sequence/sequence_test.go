@@ -346,6 +346,45 @@ func TestConcurrentAdmissionsShareOneBudget(t *testing.T) {
 	}
 }
 
+// A full store refuses rather than evicting. Evicting a live chain would
+// clear the triggers it is under, so filling the store would be the cheapest
+// way past a constraint.
+func TestAFullStoreRefusesRatherThanEvicting(t *testing.T) {
+	ctx := context.Background()
+	store := &sequence.MemoryStore{MaxRoots: 2}
+	e := evaluator(t, store)
+	seq := exfiltration()
+
+	for _, r := range []string{"root-a", "root-b"} {
+		if err := e.Admit(ctx, r, seq, read()); err != nil {
+			t.Fatalf("%s: %v", r, err)
+		}
+	}
+
+	// A third root does not fit.
+	err := e.Admit(ctx, "root-c", seq, harmless())
+	if err == nil {
+		t.Fatal("admitted a chain the store had no room for")
+	}
+	if _, isDenial := sequence.Denied(err); isDenial {
+		t.Error("a full store was reported as a constraint denial")
+	}
+
+	// The chains already tracked keep their history rather than losing it.
+	if err := e.Admit(ctx, "root-a", seq, write()); err == nil {
+		t.Fatal("root-a lost its trigger when the store filled up")
+	}
+
+	// Making room lets the new chain in.
+	store.Forget("root-b")
+	if err := e.Admit(ctx, "root-c", seq, harmless()); err != nil {
+		t.Errorf("still refused after Forget made room: %v", err)
+	}
+	if got := store.Len(); got != 2 {
+		t.Errorf("store holds %d roots, want 2", got)
+	}
+}
+
 func TestForgetDiscardsAChainsHistory(t *testing.T) {
 	ctx := context.Background()
 	store := sequence.NewMemoryStore()

@@ -148,7 +148,7 @@ For every link *i* > 0, all of the following MUST hold. Together these make the 
 2. `exp(i)` ≤ `exp(i-1)`
 3. `max_depth(i)` ≤ `max_depth(i-1) − 1`, and `max_depth(i)` ≥ 0. Together these make the budget strictly decreasing and finite, which is what bounds chain length.
 4. `depth(i)` = `depth(i-1) + 1`
-5. `seq(i)` is at least as restrictive as `seq(i-1)`: numeric budgets do not increase, and the constraint set is a superset.
+5. `seq(i)` is at least as restrictive as `seq(i-1)`: numeric budgets do not increase, and the constraint set is a superset. `max_invocations` is never negative, and zero means unlimited — so a child may only be zero where its parent was. A verifier MUST treat any non-positive child budget under a positive parent as widening, because a comparison that reads a negative as "smaller" is an escape rather than an attenuation.
 6. `root(i)` is byte-identical to `root(i-1)`.
 
 A child that violates any rule is not a valid delegation. There is no "escalation with approval" path in the format; raising authority requires a new chain issued from the sponsor.
