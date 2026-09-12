@@ -1,0 +1,57 @@
+name: fuzz-nightly
+
+# The per-pull-request pass is 60 seconds per target, which catches
+# regressions but not much else. This runs a real campaign and keeps any
+# crasher it finds, so the failure is reproducible rather than a log line
+# saying something went wrong overnight.
+
+on:
+  schedule:
+    - cron: '13 3 * * *'
+  workflow_dispatch:
+    inputs:
+      fuzztime:
+        description: How long to fuzz each target
+        required: false
+        default: 15m
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    name: fuzz ${{ matrix.package }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - ./pkg/mda
+          - ./pkg/verify
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Fuzz
+        env:
+          FUZZTIME: ${{ inputs.fuzztime || '15m' }}
+        run: |
+          status=0
+          for target in $(go test -list 'Fuzz.*' ${{ matrix.package }} | grep '^Fuzz' || true); do
+            echo "::group::$target"
+            go test -run '^$' -fuzz "^${target}$" -fuzztime="$FUZZTIME" ${{ matrix.package }} || status=1
+            echo "::endgroup::"
+          done
+          exit $status
+
+      - name: Keep any crasher
+        if: failure()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: fuzz-crashers-${{ strategy.job-index }}
+          path: |
+            **/testdata/fuzz/**
+          if-no-files-found: ignore
+          retention-days: 30

@@ -46,6 +46,7 @@ The identity regexp matters. Verifying only that *something* signed the file pro
 | Build, unit tests with the race detector | every push and pull request |
 | `golangci-lint` | every push and pull request |
 | Fuzzing of parsing and chain verification | every pull request, and before release |
+| Extended fuzzing campaign, crashers retained | nightly |
 | CNCF dependency license allowlist | every push and pull request, plus weekly |
 | `govulncheck` | every push and pull request, plus weekly |
 | CodeQL, `security-extended` | every push and pull request |
@@ -63,4 +64,4 @@ Stated because a supply-chain document that lists only strengths is marketing.
 - **No third-party security review.** One is a required gate for v1.0. Until then the verifier is unreviewed by anyone outside the project.
 - **Single maintainer.** One person can currently push to the default branch and cut a release. This is the strongest argument against depending on Mandatum today, and it is why maintainers from a second organization is a v1.0 gate rather than an aspiration.
 - **No reproducible builds.** The source archive is deterministic because it is `git archive`, but there are no compiled artifacts yet, so the harder question has not been answered.
-- **`@latest` tooling.** `go-licenses` and `govulncheck` are installed at `@latest` in CI. That keeps vulnerability data current but means the toolchain is not pinned. Pinning is tracked for v0.2, along with whether pinning a vulnerability scanner is actually desirable.
+- **`@latest` tooling.** Every GitHub Action is pinned to a commit SHA with the version in a trailing comment, and Dependabot updates the pins. Two things are still installed at `@latest` in CI: `go-licenses` and `govulncheck`. For a vulnerability scanner that is arguably correct — a pinned scanner stops learning about new vulnerabilities — but it is an unpinned input to the build and is recorded here as one. Resolving it is tracked for v0.2.
