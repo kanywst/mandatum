@@ -3,8 +3,13 @@
 # Check, or update, the marker each translation carries recording which
 # version of its English source it was made from.
 #
-#   hack/translations.sh check    exit non-zero if any translation is stale
+#   hack/translations.sh check    report translations whose source has moved on
 #   hack/translations.sh update   re-stamp every translation as current
+#
+# check always exits zero. It reports; it does not gate. English is normative,
+# so a translation behind its source is usable, and blocking an English
+# correction until someone can translate it would make the documentation worse
+# rather than better. Read the output, not the exit code.
 #
 # The marker is a digest of the English file's contents rather than a commit
 # hash. A commit hash cannot name the commit that contains it, so a change and

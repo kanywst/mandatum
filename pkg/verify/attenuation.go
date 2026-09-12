@@ -158,7 +158,7 @@ func condCovers(p, c mda.Condition) bool {
 	// specification says a delegator can always grant nothing on a key, and
 	// that has to hold whatever the parent restricted.
 	if c.In != nil && len(c.In) == 0 {
-		return inFragment(p)
+		return p.InFragment()
 	}
 
 	switch {
@@ -220,19 +220,6 @@ func condCovers(p, c mda.Condition) bool {
 
 func inSet(set []string, v string) bool {
 	return slices.Contains(set, v)
-}
-
-// inFragment reports whether a condition sets exactly one comparison, and so
-// is one this package can reason about. A condition outside the fragment
-// cannot entail anything, including the empty set.
-func inFragment(c mda.Condition) bool {
-	set := 0
-	for _, isSet := range []bool{c.Equals != nil, c.In != nil, c.Prefix != nil, c.Min != nil || c.Max != nil} {
-		if isSet {
-			set++
-		}
-	}
-	return set == 1
 }
 
 // seqNoWider reports whether the child's sequence constraints are at least as

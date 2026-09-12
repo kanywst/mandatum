@@ -69,7 +69,13 @@ func Discover(ctx context.Context, pdp string, httpClient *http.Client) (Metadat
 	}
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := httpClient.Do(req)
+	// Same reasoning as New: the scheme check above is worthless if a
+	// redirect can move the fetch elsewhere. Copied so the caller's client
+	// is left as they configured it.
+	fetch := *httpClient
+	fetch.CheckRedirect = refuseRedirect
+
+	resp, err := fetch.Do(req)
 	if err != nil {
 		return m, fmt.Errorf("authzen: fetching PDP metadata: %w", err)
 	}
@@ -91,7 +97,10 @@ func Discover(ctx context.Context, pdp string, httpClient *http.Client) (Metadat
 
 	// The mix-up defence: a document served from one PDP must not claim to
 	// be another's, or a PEP can be steered into asking the wrong authority.
-	if m.PolicyDecisionPoint != strings.TrimSuffix(pdp, "/") && m.PolicyDecisionPoint != pdp {
+	// Both sides are normalised, because a trailing slash is a spelling of
+	// the same identifier and rejecting a PDP over one would be a bug rather
+	// than a defence.
+	if strings.TrimSuffix(m.PolicyDecisionPoint, "/") != strings.TrimSuffix(pdp, "/") {
 		return Metadata{}, fmt.Errorf(
 			"authzen: metadata at %s declares PDP %q, expected %q",
 			wellKnown.String(), m.PolicyDecisionPoint, pdp)

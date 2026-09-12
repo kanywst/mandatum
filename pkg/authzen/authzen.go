@@ -144,6 +144,20 @@ func New(endpoint string, opts ...Option) (*Client, error) {
 	if err := requireTimeout(c.http); err != nil {
 		return nil, err
 	}
+
+	// Checking the configured endpoint's scheme means nothing if the client
+	// then follows a redirect somewhere else. Go follows up to ten by
+	// default, and 307 and 308 preserve the method and the body — so a PDP
+	// that answers with a redirect to http could have the subject's identity
+	// re-sent in plaintext, having passed every check above.
+	//
+	// An Access Evaluation endpoint has no reason to redirect, so none are
+	// followed. The client is copied first: mutating one the caller handed
+	// us would change its behaviour everywhere else they use it.
+	client := *c.http
+	client.CheckRedirect = refuseRedirect
+	c.http = &client
+
 	return c, nil
 }
 
@@ -282,6 +296,15 @@ func isLoopback(host string) bool {
 		return true
 	}
 	return net.ParseIP(host).IsLoopback()
+}
+
+// refuseRedirect stops the client following any redirect. Returning
+// http.ErrUseLastResponse would hand back the 3xx as if it were an answer,
+// which a caller could mistake for a decision; an error is unambiguous.
+func refuseRedirect(req *http.Request, via []*http.Request) error {
+	return fmt.Errorf(
+		"authzen: %s redirected to %s; an evaluation endpoint must not redirect, and following one can downgrade the transport",
+		via[len(via)-1].URL.Redacted(), req.URL.Redacted())
 }
 
 // requireTimeout enforces the invariant every outbound call here shares.

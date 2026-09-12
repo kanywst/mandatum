@@ -330,6 +330,69 @@ func TestDiscoveryFailureCarriesTheBody(t *testing.T) {
 	}
 }
 
+// Validating the configured endpoint's scheme is worthless if the client
+// then follows a redirect somewhere else. 307 and 308 preserve the body, so
+// a redirect to http would re-send the subject's identity in plaintext,
+// having passed every check.
+func TestRedirectsAreRefused(t *testing.T) {
+	var downstream *httptest.Server
+	downstream = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/elsewhere" {
+			_, _ = w.Write([]byte(`{"decision":true}`))
+			return
+		}
+		http.Redirect(w, r, downstream.URL+"/elsewhere", http.StatusTemporaryRedirect)
+	}))
+	defer downstream.Close()
+
+	c, err := authzen.New(downstream.URL+"/access/v1/evaluation",
+		authzen.WithHTTPClient(&http.Client{Timeout: 2 * time.Second}))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	d, err := c.Evaluate(context.Background(), request())
+	if err == nil {
+		t.Fatal("followed a redirect and accepted the answer at the other end")
+	}
+	if d.Allowed {
+		t.Fatal("the returned Decision allowed")
+	}
+	if !strings.Contains(err.Error(), "must not redirect") {
+		t.Errorf("unexpected reason: %v", err)
+	}
+}
+
+// Setting CheckRedirect must not reach back into the client the caller
+// handed over, which they may be using elsewhere.
+func TestTheCallersClientIsNotMutated(t *testing.T) {
+	caller := &http.Client{Timeout: 2 * time.Second}
+	if _, err := authzen.New("https://pdp.example.org/access/v1/evaluation",
+		authzen.WithHTTPClient(caller)); err != nil {
+		t.Fatal(err)
+	}
+	if caller.CheckRedirect != nil {
+		t.Error("New changed the redirect policy of the caller's own client")
+	}
+}
+
+// A trailing slash is a spelling of the same identifier. Rejecting a PDP over
+// one would be a bug wearing the costume of a security check.
+func TestDiscoverToleratesATrailingSlash(t *testing.T) {
+	var srv *httptest.Server
+	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte(`{
+			"policy_decision_point": "` + srv.URL + `/",
+			"access_evaluation_endpoint": "` + srv.URL + `/access/v1/evaluation"
+		}`))
+	}))
+	defer srv.Close()
+
+	if _, err := authzen.Discover(context.Background(), srv.URL, timed(srv)); err != nil {
+		t.Errorf("rejected a PDP that spells its own identifier with a trailing slash: %v", err)
+	}
+}
+
 func TestDiscover(t *testing.T) {
 	var srv *httptest.Server
 	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
