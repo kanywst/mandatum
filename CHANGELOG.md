@@ -6,7 +6,9 @@ Each release also records which Delegation Assertion format versions (`mdt.v`) i
 
 ## [Unreleased]
 
-Nothing yet.
+### Fixed
+
+- The release workflow signed nothing. cosign v3 deprecated `--output-signature` and `--output-certificate` and ignores them when writing the new bundle format, so the step failed outright rather than quietly producing an unsigned release — but only because it also errored on the empty `--bundle` path. Releases now write a Sigstore bundle, and the verification instructions match.
 
 ## [0.1.0-rc.1] - 2026-09-12
 
