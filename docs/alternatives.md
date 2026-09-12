@@ -26,12 +26,26 @@ The three capabilities Mandatum claims are missing in combination:
 | AWS Bedrock AgentCore Gateway | partial | no | no | Cedar-based, AWS-bound. |
 | SPIFFE / SPIRE | no | no | n/a | Workload identity. Answers "what is this workload", not "on whose authority does it act". Mandatum builds on it. |
 | IETF WIMSE drafts | no | no | n/a | The workload-identity half. Mandatum's chain rides on it. |
-| RFC 8693 token exchange | partial | no | n/a | The `act` claim expresses one delegation hop. No attenuation rules, no depth limit, no chain verification, no sequence. Mandatum uses it for issuance. |
+| RFC 8693 token exchange | no | no | n/a | Nested `act` claims record prior actors, but §4.1 puts them out of reach: a consumer "MUST only consider the token's top-level claims and the party identified as the current actor". Prior actors are informational. See "RFC 8693 and §4.1" below. |
 | Macaroons | no | no | n/a | The origin of attenuated capabilities with offline verification. No human root, no sequence constraints, no authorization-API binding. Direct prior art. |
 | Biscuit | no | partial | no | Modern attenuated tokens with an embedded Datalog policy language. Closest technical relative. Attenuation is per-token; there is no sponsor root and no cross-call sequence state, and the policy language is Biscuit's own rather than a decision handed to an external PDP. |
 | OpenFGA / SpiceDB / Cerbos / OPA / Cedar | n/a | no | n/a | Engines. They answer a question. Mandatum decides what question to ask and proves the asker's authority. |
 | Guardrails libraries (guardrails-ai, NeMo) | no | partial | no | Content filtering on model input and output. Different layer; no identity, no authority, no audit of authorization decisions. |
 | SIEM and audit platforms | no | no | n/a | Record the terminal API call. Miss the decision chain that produced it. |
+
+## RFC 8693 and §4.1
+
+Worth its own section, because the obvious reading of Mandatum is "a chain of prior actors, which is what `act` is for", and that reading makes it look like a violation.
+
+RFC 8693 §4.1 says a consumer of a token "MUST only consider the token's top-level claims and the party identified as the current actor by the `act` claim", and that "Prior actors identified by any nested `act` claims are informational only and are not to be considered in access control decisions". The `MUST` sits on the positive obligation; the sentence about prior actors carries no RFC 2119 keyword of its own and follows from it.
+
+That is a deliberate model rather than an omission. The paragraph before it says the current actor "is considered to include the entire authorization/delegation history", and §4.4 gives the authorization server `may_act` as the gate on whether a delegation may happen at all. The chain's weight is spent when the token is issued. The resource server authorizes the current actor and nothing behind it.
+
+**Mandatum does not use nested `act`, and is not an attempt to make it authoritative.** A Delegation Assertion chain is a separate credential: each link is independently signed, commits to its parent by hash, and is checked to have narrowed. Those are properties `act` does not carry and was not built to, which is why reading one as the other gets the comparison wrong in both directions.
+
+What follows honestly from §4.1 is that authorizing on a delegation history at the resource server is an extension of the RFC 8693 model, not a gap in it. Mandatum is that extension. A deployment doing both should know it is relying on Mandatum's verification for the chain, and on RFC 8693 only for issuance.
+
+This section exists because @arjun2075 corrected the project's earlier reading in [openid/authzen#612](https://github.com/openid/authzen/issues/612), where these documents had described the RFC as silent on what a resource server should do with a chain.
 
 ## The entries worth arguing about
 
