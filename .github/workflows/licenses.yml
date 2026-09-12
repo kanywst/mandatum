@@ -48,3 +48,21 @@ jobs:
             exit 1
           fi
           echo "LICENSE is the canonical Apache-2.0 text."
+
+  dependency-review:
+    name: new dependencies are allowlisted
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Blocks at the point a dependency is proposed. hack/check-licenses.sh
+      # scans what is already there; this refuses the pull request that would
+      # add something outside the CNCF allowlist, which is a much cheaper
+      # place to say no.
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          allow-licenses: >-
+            Apache-2.0, 0BSD, BSD-2-Clause, BSD-3-Clause, MIT, MIT-0, ISC,
+            OpenSSL, PostgreSQL, Python-2.0, UPL-1.0, X11, Zlib
+          comment-summary-in-pr: on-failure
+          fail-on-severity: low

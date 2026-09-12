@@ -1,0 +1,104 @@
+name: quality
+
+# Checks on the things that check everything else. A broken workflow, a shell
+# script with an unquoted expansion, or a dead link in the specification are
+# all invisible to the Go toolchain.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  actions:
+    name: workflows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: actionlint
+        # Catches the class of mistake that only shows up when a workflow
+        # runs: a bad expression, an undefined output, a shell error in a
+        # run block.
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@latest
+          actionlint -color
+
+      - name: zizmor
+        # Static analysis for workflow security: injectable expressions,
+        # over-broad permissions, unpinned actions, credential persistence.
+        # A project about verifiable delegation should not be handing its own
+        # CI more authority than it needs.
+        run: |
+          pipx install zizmor
+          zizmor --persona=pedantic --format plain .github/workflows/
+
+  shell:
+    name: shell scripts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: shellcheck
+        run: shellcheck --severity=style hack/*.sh
+
+  spelling:
+    name: spelling
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # Skips the Japanese translations, whose words codespell does not know,
+      # and the license text, which is not ours to correct. "crasher" is
+      # fuzzing's word for an input that crashes a target, not a typo.
+      - name: codespell
+        run: |
+          pipx install codespell
+          codespell \
+            --skip='./.git,./LICENSE,*.ja.md,go.sum' \
+            --ignore-words-list='mandatum,crasher,crashers,ist,nd,te' \
+            .
+
+  links:
+    name: documentation links
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: lychee
+        uses: lycheeverse/lychee-action@e7477775783ea5526144ba13e8db5eec57747ce8 # v2.9.0
+        with:
+          # Relative links matter most: the documents cross-reference each
+          # other heavily, and a broken one sends a reader to a 404 in a
+          # specification. External links are checked too but do not fail the
+          # build on a transient outage.
+          args: >-
+            --no-progress
+            --accept 200,206,429
+            --exclude-path ./LICENSE
+            --max-retries 2
+            './**/*.md'
+          fail: true
+        continue-on-error: true
+
+      - name: relative links resolve
+        # The step above tolerates the internet being unreliable. This one
+        # does not tolerate a link into our own tree being wrong, because
+        # that is entirely within the project's control.
+        run: |
+          status=0
+          while IFS= read -r file; do
+            dir=$(dirname "$file")
+            # Markdown links that are not URLs, anchors or mailto.
+            grep -oE '\]\([^)#][^)]*\)' "$file" 2>/dev/null \
+              | sed -E 's/^\]\(//; s/\)$//; s/#.*$//' \
+              | grep -vE '^(https?:|mailto:|$)' \
+              | while IFS= read -r target; do
+                  [ -z "$target" ] && continue
+                  if [ ! -e "$dir/$target" ]; then
+                    echo "::error file=$file::broken relative link: $target"
+                    exit 1
+                  fi
+                done || status=1
+          done < <(find . -name '*.md' -not -path './.git/*')
+          exit $status
