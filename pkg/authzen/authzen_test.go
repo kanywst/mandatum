@@ -14,6 +14,14 @@ import (
 	"github.com/kanywst/mandatum/pkg/verify"
 )
 
+// timed returns a test server's client with a deadline. httptest hands back
+// an untimed one, which Discover now refuses for the same reason New does.
+func timed(srv *httptest.Server) *http.Client {
+	c := srv.Client()
+	c.Timeout = 2 * time.Second
+	return c
+}
+
 func request() authzen.Request {
 	return authzen.Request{
 		Subject:  authzen.Subject{Type: "identity", ID: "u-8f31c02e"},
@@ -275,7 +283,7 @@ func TestDiscover(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	m, err := authzen.Discover(context.Background(), srv.URL, srv.Client())
+	m, err := authzen.Discover(context.Background(), srv.URL, timed(srv))
 	if err != nil {
 		t.Fatalf("Discover: %v", err)
 	}
@@ -295,7 +303,7 @@ func TestDiscoverRejectsAMismatchedIdentifier(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	m, err := authzen.Discover(context.Background(), srv.URL, srv.Client())
+	m, err := authzen.Discover(context.Background(), srv.URL, timed(srv))
 	if err == nil {
 		t.Fatal("accepted metadata declaring a different PDP")
 	}
@@ -307,6 +315,22 @@ func TestDiscoverRejectsAMismatchedIdentifier(t *testing.T) {
 	}
 }
 
+// net/http applies a deadline only for a positive timeout, so a negative one
+// is "no timeout" just as zero is. Both must be refused, or the guard is
+// satisfied by a value that defeats it.
+func TestATimeoutlessClientIsRefused(t *testing.T) {
+	for _, d := range []time.Duration{0, -1} {
+		if _, err := authzen.New("https://pdp.example.org/access/v1/evaluation",
+			authzen.WithHTTPClient(&http.Client{Timeout: d})); err == nil {
+			t.Errorf("New accepted a client with timeout %s", d)
+		}
+		if _, err := authzen.Discover(context.Background(), "https://pdp.example.org",
+			&http.Client{Timeout: d}); err == nil {
+			t.Errorf("Discover accepted a client with timeout %s", d)
+		}
+	}
+}
+
 func TestDiscoverRejectsMetadataWithoutAnEndpoint(t *testing.T) {
 	var srv *httptest.Server
 	srv = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -314,7 +338,7 @@ func TestDiscoverRejectsMetadataWithoutAnEndpoint(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	if _, err := authzen.Discover(context.Background(), srv.URL, srv.Client()); err == nil {
+	if _, err := authzen.Discover(context.Background(), srv.URL, timed(srv)); err == nil {
 		t.Fatal("accepted metadata with no access_evaluation_endpoint")
 	}
 }

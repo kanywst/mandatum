@@ -11,6 +11,10 @@ Each release also records which Delegation Assertion format versions (`mdt.v`) i
 - `pkg/authzen`: an OpenID AuthZEN Authorization API 1.0 client and the mapping from a verified chain onto an Access Evaluation request, following the COAZ-MCP default mapping for `tools/call`. PDP metadata discovery included, with the mix-up check the PDP identifier exists for.
 - `verify.Result.Actors`: the principals a chain's authority passed through, from the sponsor's grantee to the acting agent.
 
+### Fixed
+
+- `condCovers` refused an empty `in` condition under an `eq` or range parent, contradicting the specification's own §6.1 boundary case, which says a delegator can always grant nothing on a key. An empty set matches nothing and is the narrowest restriction expressible, so every parent in the decidable fragment now entails it. The old behaviour failed safe — over-restrictive, never widening — but the specification said otherwise.
+
 ### Changed
 
 - The specification's AuthZEN example now matches the COAZ-MCP binding: the human sponsor is `subject`, the acting agent is `context.agent`, and the rest of the chain sits under a vendor-prefixed context key because the binding leaves upstream actors undefined rather than forbidding them. The previous example invented `subject.type: "agent"` and `resource.type: "mcp_tool"`, which is exactly the parallel mapping the non-goals say not to define.

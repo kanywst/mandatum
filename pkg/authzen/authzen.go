@@ -139,9 +139,12 @@ func New(endpoint string, opts ...Option) (*Client, error) {
 	for _, o := range opts {
 		o(c)
 	}
-	if c.http.Timeout == 0 {
-		return nil, errors.New(
-			"authzen: the HTTP client has no timeout; an evaluation that never returns is an enforcement point that never answers")
+	// net/http applies a deadline only when Timeout is positive, so a
+	// negative value is "no timeout" just as zero is.
+	if c.http.Timeout <= 0 {
+		return nil, fmt.Errorf(
+			"authzen: the HTTP client's timeout is %s; an evaluation that never returns is an enforcement point that never answers",
+			c.http.Timeout)
 	}
 	return c, nil
 }

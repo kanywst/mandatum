@@ -58,6 +58,13 @@ func Discover(ctx context.Context, pdp string, httpClient *http.Client) (Metadat
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: DefaultTimeout}
 	}
+	// The same standard New holds a client to. A caller who reuses one
+	// client for both would otherwise get a guarded evaluation and an
+	// unguarded metadata fetch that can hang indefinitely.
+	if httpClient.Timeout <= 0 {
+		return m, fmt.Errorf(
+			"authzen: the HTTP client's timeout is %s; discovery must not hang", httpClient.Timeout)
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, wellKnown.String(), nil)
 	if err != nil {
 		return m, fmt.Errorf("authzen: building the metadata request: %w", err)

@@ -75,6 +75,24 @@ func TestCondCovers(t *testing.T) {
 		{"range/parent max only, child min only", mda.Condition{Max: num(10)}, mda.Condition{Min: num(2)}, false},
 		{"range/eq child", mda.Condition{Min: num(1), Max: num(10)}, mda.Condition{Equals: str("5")}, false},
 
+		// An empty set matches nothing, so it is the bottom of the lattice:
+		// every parent in the fragment entails it, whatever kind it is. The
+		// specification says a delegator can always grant nothing on a key,
+		// and that has to hold under an eq or range parent too.
+		{"eq/in empty", mda.Condition{Equals: str("a")}, mda.Condition{In: []string{}}, true},
+		{"prefix/in empty", mda.Condition{Prefix: str("ab")}, mda.Condition{In: []string{}}, true},
+		{"range/in empty", mda.Condition{Min: num(1), Max: num(10)}, mda.Condition{In: []string{}}, true},
+		{"range min only/in empty", mda.Condition{Min: num(1)}, mda.Condition{In: []string{}}, true},
+		// A parent outside the fragment cannot entail anything, including
+		// the empty set: there is nothing to reason from.
+		{"invalid parent/in empty", mda.Condition{}, mda.Condition{In: []string{}}, false},
+		{
+			"ambiguous parent/in empty",
+			mda.Condition{Equals: str("a"), Prefix: str("a")},
+			mda.Condition{In: []string{}},
+			false,
+		},
+
 		// A parent condition outside the fragment cannot be reasoned about.
 		{"empty parent", mda.Condition{}, mda.Condition{Equals: str("a")}, false},
 		{"empty both", mda.Condition{}, mda.Condition{}, false},
