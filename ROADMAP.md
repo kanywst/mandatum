@@ -57,9 +57,10 @@ Gates: works against three PDPs from different vendors with no implementation-sp
 
 ### v0.3 — Sequence evaluation and audit (2027 Q2)
 
-- Constraint compilation to finite automata, with rejection at issuance of constraints that do not compile
-- Bounded per-chain sequence state
-- Fail-closed behaviour on state loss, with a test that proves it
+- ~~Constraint compilation, with rejection of constraints that do not compile~~ done
+- ~~Bounded per-chain sequence state~~ done
+- ~~Fail-closed behaviour on state loss, with a test that proves it~~ done
+- A replicated sequence store, since the in-process one is single-PEP only
 - Tamper-evident audit log with inclusion and consistency proofs
 - Replay: re-evaluate a logged decision against its recorded policy revision
 

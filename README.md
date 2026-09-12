@@ -6,7 +6,7 @@
 
 **Verifiable delegation for AI agents.** An agent's authority to act becomes a signed chain rooted in a named human — attenuating at every hop, revocable at any link, evaluated across whole action sequences, and recorded in a tamper-evident log.
 
-> **Status: early.** The format, the verifier, the signing layer and the issuer work end to end and are tested against real signatures. Sequence evaluation, the audit log and the AuthZEN binding are not built yet, and nothing here has had a third-party security review. See [ROADMAP.md](ROADMAP.md) and the [threat model](docs/security/threat-model.md) for what that means in practice.
+> **Status: early.** The format, the verifier, the signing layer and the issuer work end to end and are tested against real signatures. The AuthZEN binding and sequence evaluation work too. The audit log is not built, the sequence store is in-process only, and nothing here has had a third-party security review. See [ROADMAP.md](ROADMAP.md) and the [threat model](docs/security/threat-model.md) for what that means in practice.
 >
 > The specification is the thing to read and argue with: [`docs/spec/delegation-assertion.md`](docs/spec/delegation-assertion.md).
 

@@ -123,6 +123,12 @@ type Result struct {
 	ChainDigest string
 	// LeafID is the leaf's jti: the handle to revoke this agent alone.
 	LeafID string
+	// RootID is the sponsor's grant, at depth 0. Sequence state is kept per
+	// chain root, so this is the key it is kept under: every chain descending
+	// from one grant shares a history, which is what makes a constraint
+	// binding across sub-delegation rather than resettable by making another
+	// agent.
+	RootID string
 }
 
 // Verify checks a chain against rules V1 through V9 and returns what the
@@ -184,6 +190,7 @@ func (v *Verifier) Verify(ctx context.Context, chain mda.Chain) (*Result, error)
 		Depth:        leaf.Claims.Mandatum.Depth,
 		ChainDigest:  ChainDigest(chain),
 		LeafID:       leaf.Claims.ID,
+		RootID:       chain[0].Claims.ID,
 	}, nil
 }
 

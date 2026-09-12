@@ -260,6 +260,26 @@ Two properties are required and shape the implementation:
 
 Sequence state is per chain root and is therefore shared across PEPs. The reference implementation supports a single-process store for development and a replicated store for production; the interface is defined in `docs/spec/sequence-store.md`.
 
+### 9.1 What the state is keyed by
+
+Sequence state is kept per **chain root** — the `jti` of the depth-0 assertion — not per agent. A constraint an agent inherits therefore cannot be escaped by delegating to a freshly minted sub-agent, because the sub-agent's actions land in the same history.
+
+This has a consequence worth stating rather than discovering: two sibling chains descending from one sponsor grant share a history, so they share an invocation budget. A budget of 100 is 100 actions across everything that grant produced, not 100 each. That is the conservative reading — the budget is the sponsor's to spend — but it is a choice, and §12 records it as open.
+
+A store MUST make read-modify-write atomic per root. Two agents acting at once under one chain that each read the state before either writes will each see room in a budget of one.
+
+### 9.2 Triggers fire after the check
+
+A constraint reads "once an action matching `after` has happened, an action matching `forbid` is denied". The trigger is evaluated **after** the current action has been admitted, so an action that matches both `forbid` and `after` is permitted once and refused thereafter. Evaluating it before would make such a constraint deny its own trigger, which no operator writing one intends.
+
+### 9.3 An empty trigger is not permitted
+
+A constraint whose `after` matches everything is refused at issuance and again at evaluation.
+
+It looks like a way to write "never allow this", and it is not: because a trigger needs something to have happened, an empty one takes effect from the chain's *second* action rather than its first. The gap is silent and the deployment believes it has a prohibition it does not have.
+
+An unconditional prohibition belongs in the capability set, where it applies from the first action and attenuates down the chain like everything else. An empty `forbid` is a different matter and remains valid: "after reading untrusted content, do nothing else at all" is a coherent and useful rule.
+
 ## 10. Audit trail
 
 Every decision — allow and deny — appends one record to a tamper-evident log:
@@ -306,7 +326,8 @@ Honest list. These are unresolved and feedback is wanted.
 2. Is the finite-automaton constraint language expressive enough for real operator needs, or does it need bounded counting beyond simple budgets?
 3. Should Mandatum define its own revocation distribution, or adopt an existing status mechanism (OAuth Status Lists) unchanged?
 4. How should chains behave across trust domains? SPIFFE federation gives a key resolution answer but not a policy answer for cross-domain sponsorship.
-5. Is a delegation chain the right shape for multi-sponsor scenarios — an agent acting for two people at once — or does that need a different structure?
+5. Sibling chains under one sponsor grant share an invocation budget (§9.1). Is that the reading operators expect, or should a budget be per leaf, or per delegation subtree?
+6. Is a delegation chain the right shape for multi-sponsor scenarios — an agent acting for two people at once — or does that need a different structure?
 
 ## 13. References
 
