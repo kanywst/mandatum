@@ -151,6 +151,89 @@ func TestEmptyCapabilitiesGrantNothingAndAreValid(t *testing.T) {
 // every chain the other produces. These vectors are the ones published in
 // docs/spec/delegation-assertion.md §5.1, so the specification and the code
 // cannot drift apart without a test failing.
+// An explicitly empty `in` is how a delegator grants nothing on a key, and
+// section 6.1 promises every parent condition entails it. That promise is
+// worthless if the empty set does not survive serialization: encoding/json
+// drops a zero-length slice under omitempty regardless of nil-ness, which
+// would turn "restricts everything" into "no comparison set" — an invalid
+// condition — somewhere between the issuer and the verifier.
+func TestAnEmptyInSurvivesTheWire(t *testing.T) {
+	raw, err := json.Marshal(Condition{In: []string{}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var back Condition
+	if err := json.Unmarshal(raw, &back); err != nil {
+		t.Fatal(err)
+	}
+	if back.In == nil {
+		t.Fatalf("an empty in became absent on the wire: %s", raw)
+	}
+	if len(back.In) != 0 {
+		t.Errorf("in = %v, want empty", back.In)
+	}
+	if err := back.validate(); err != nil {
+		t.Errorf("the round-tripped condition is invalid: %v", err)
+	}
+}
+
+// An absent `in` must stay absent, or every condition would look like it
+// restricts a key to nothing.
+func TestAnAbsentInStaysAbsent(t *testing.T) {
+	eq := "public"
+	raw, err := json.Marshal(Condition{Equals: &eq})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var back Condition
+	if err := json.Unmarshal(raw, &back); err != nil {
+		t.Fatal(err)
+	}
+	if back.In != nil {
+		t.Errorf("an absent in came back as %v", back.In)
+	}
+	if err := back.validate(); err != nil {
+		t.Errorf("round-tripped condition is invalid: %v", err)
+	}
+}
+
+// Attenuation checking depends on this count agreeing with validation. Two
+// copies of the field list would drift, and the verifier's copy is the one
+// that decides whether authority may widen.
+func TestConditionComparisons(t *testing.T) {
+	eq, pre := "a", "b"
+	min := 1.0
+
+	tests := []struct {
+		name string
+		cond Condition
+		want int
+	}{
+		{"none", Condition{}, 0},
+		{"eq", Condition{Equals: &eq}, 1},
+		{"in", Condition{In: []string{"a"}}, 1},
+		{"in empty", Condition{In: []string{}}, 1},
+		{"prefix", Condition{Prefix: &pre}, 1},
+		{"min only", Condition{Min: &min}, 1},
+		{"min and max count once", Condition{Min: &min, Max: &min}, 1},
+		{"two kinds", Condition{Equals: &eq, Prefix: &pre}, 2},
+		{"three kinds", Condition{Equals: &eq, Prefix: &pre, Min: &min}, 3},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.cond.Comparisons(); got != tt.want {
+				t.Errorf("Comparisons() = %d, want %d", got, tt.want)
+			}
+			if got, want := tt.cond.InFragment(), tt.want == 1; got != want {
+				t.Errorf("InFragment() = %v, want %v", got, want)
+			}
+			if err := tt.cond.validate(); (err == nil) != (tt.want == 1) {
+				t.Errorf("validate() = %v, but Comparisons() = %d", err, tt.want)
+			}
+		})
+	}
+}
+
 func TestDigestMatchesTheSpecificationVectors(t *testing.T) {
 	vectors := map[string]string{
 		"":         "sha-256:47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",

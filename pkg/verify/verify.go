@@ -106,6 +106,12 @@ type Result struct {
 	Sponsor mda.Sponsor
 	// Agent is the acting principal: the leaf's subject.
 	Agent string
+	// Actors lists every principal the authority passed through, in order,
+	// from the agent the sponsor granted to, down to Agent. It answers "who
+	// was upstream". On its own it is a list; paired with ChainDigest, which
+	// commits to the exact links, it is a list that cannot have been
+	// assembled from pieces of other chains.
+	Actors []string
 	// Capabilities is the leaf's capability set, already known to be within
 	// everything above it.
 	Capabilities []mda.Capability
@@ -165,9 +171,14 @@ func (v *Verifier) Verify(ctx context.Context, chain mda.Chain) (*Result, error)
 	}
 
 	leaf := chain[len(chain)-1]
+	actors := make([]string, len(chain))
+	for i, a := range chain {
+		actors[i] = a.Claims.Subject
+	}
 	return &Result{
 		Sponsor:      leaf.Claims.Mandatum.Root,
 		Agent:        leaf.Claims.Subject,
+		Actors:       actors,
 		Capabilities: leaf.Claims.Mandatum.Capabilities,
 		Sequence:     leaf.Claims.Mandatum.Sequence,
 		Depth:        leaf.Claims.Mandatum.Depth,

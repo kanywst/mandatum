@@ -2,7 +2,7 @@
 
 **English** | [日本語](delegation-assertion.ja.md)
 
-Status: **Draft 0.1** — design document, not yet implemented. Last updated: 2026-09-12
+Status: **Draft 0.1**. Implemented, and not yet reviewed by anyone outside the project. Last updated: 2026-09-12
 
 ## 1. Problem
 
@@ -195,28 +195,45 @@ A verified chain becomes the subject context of an OpenID AuthZEN Authorization 
 ```json
 {
   "subject": {
-    "type": "agent",
-    "id": "spiffe://example.org/ns/agents/retriever",
+    "type": "identity",
+    "id": "u-8f31c02e",
+    "properties": { "iss": "https://idp.example.org" }
+  },
+  "action": { "name": "tools/call" },
+  "resource": {
+    "type": "tool",
+    "id": "search.query",
     "properties": {
-      "mandatum": {
-        "root": { "iss": "https://idp.example.org", "sub": "u-8f31c02e" },
-        "chain": "sha-256:LPJNul-wow4m6DsqxbninhsWHlwfp0JecwQzYpOLmCQ",
-        "depth": 2,
-        "cap_digest": "sha-256:n4bQgYhMfWWaL-qgxVrQFaO_TxsrC4Is0V1sFbDwCgg"
-      }
+      "server": "https://mcp.example.org",
+      "arguments": { "index": "public" }
     }
   },
-  "resource": {
-    "type": "mcp_tool",
-    "id": "search.query",
-    "properties": { "server": "https://mcp.example.org", "args": { } }
-  },
-  "action": { "name": "invoke" },
   "context": {
-    "mandatum_seq": { "invocations": 17, "history_digest": "sha-256:jUMrViVq7f3wcuQ44n0wJz5BNoNwIcxeu0MS7PGfEZI", "violated": [] }
+    "agent": "spiffe://example.org/ns/agents/retriever",
+    "mandatum.delegation": {
+      "sponsor": {
+        "iss": "https://idp.example.org",
+        "sub": "u-8f31c02e",
+        "amr": ["pwd", "hwk"],
+        "auth_time": 1789199400
+      },
+      "chain": "sha-256:LPJNul-wow4m6DsqxbninhsWHlwfp0JecwQzYpOLmCQ",
+      "actors": [
+        "spiffe://example.org/ns/agents/planner",
+        "spiffe://example.org/ns/agents/retriever"
+      ],
+      "depth": 1,
+      "leaf": "01JB2XA4M0RN5S8Q2K7T3W1Y9D"
+    }
   }
 }
 ```
+
+The shape of `subject`, `action`, `resource` and `context.agent` is the COAZ-MCP default mapping for `tools/call`, unchanged. Under that binding `subject` is the principal on whose behalf access is requested and `context.agent` is the acting client, which is exactly the split a sponsor-rooted chain already has: the human goes in `subject`, the leaf agent in `context.agent`.
+
+`context.agent` carries one hop and never a chain. The binding says upstream actors are separately addressable and leaves where they go undefined, so Mandatum puts them under a vendor-prefixed key rather than inventing a name inside the binding's namespace. Its presence is itself a claim: a PEP populates it only from a chain that passed every rule in §7, so a PDP may rely on it for the same reason it may rely on `subject.id`.
+
+`actors` answers "who was upstream". `chain` is what makes it more than a list — it commits to the exact links, so a sequence of actors cannot be reassembled from pieces of other chains. Whether the commitment is necessary, or a verified list is enough, is genuinely open; see §12.
 
 The chain is verified **before** the PDP is called. The PDP receives a statement of fact ("this agent holds a valid chain rooted in this human") and applies organizational policy on top. Separating the two means an operator can change policy without changing credential handling, and a compromised PDP cannot manufacture authority that no sponsor granted.
 

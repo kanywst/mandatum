@@ -119,8 +119,17 @@ type ActionPattern struct {
 // is set; a condition with zero or more than one set is invalid and must be
 // rejected at issuance rather than interpreted at verification time.
 type Condition struct {
-	Equals *string  `json:"eq,omitempty"`
-	In     []string `json:"in,omitempty"`
+	Equals *string `json:"eq,omitempty"`
+
+	// In carries no omitempty, deliberately. An empty set is meaningful —
+	// it matches nothing, and is how a delegator grants nothing on a key —
+	// but encoding/json treats a zero-length slice as empty regardless of
+	// nil-ness, so omitempty would drop it. The distinction would then
+	// survive in memory and vanish on the wire, which is the worst place
+	// for a semantic difference to disappear. Absent encodes as null and
+	// decodes back to nil; `[]` decodes to an empty non-nil slice.
+	In []string `json:"in"`
+
 	Prefix *string  `json:"prefix,omitempty"`
 	Min    *float64 `json:"min,omitempty"`
 	Max    *float64 `json:"max,omitempty"`
@@ -259,29 +268,41 @@ func (c Capability) validate() error {
 	return nil
 }
 
+// Comparisons counts how many of the mutually exclusive alternatives this
+// condition sets.
+//
+// Exported because attenuation checking needs the same count, and two copies
+// of the field list would drift. When they drift, the verifier's copy is the
+// one that decides whether authority may widen.
+func (c Condition) Comparisons() int {
+	set := 0
+	for _, isSet := range []bool{
+		c.Equals != nil,
+		c.In != nil,
+		c.Prefix != nil,
+		c.Min != nil || c.Max != nil,
+	} {
+		if isSet {
+			set++
+		}
+	}
+	return set
+}
+
+// InFragment reports whether this condition is one the decidable fragment can
+// reason about: exactly one comparison, no more and no fewer.
+func (c Condition) InFragment() bool { return c.Comparisons() == 1 }
+
 // validate enforces that exactly one alternative is set. A condition with none
 // set would match everything; one with several set would need a combination
 // rule that the decidable fragment deliberately does not define.
 func (c Condition) validate() error {
-	set := 0
-	if c.Equals != nil {
-		set++
-	}
-	if c.In != nil {
-		set++
-	}
-	if c.Prefix != nil {
-		set++
-	}
-	if c.Min != nil || c.Max != nil {
-		set++
-	}
-	switch set {
+	switch n := c.Comparisons(); n {
 	case 1:
 		return nil
 	case 0:
 		return fmt.Errorf("no comparison set; a condition that restricts nothing is not a condition")
 	default:
-		return fmt.Errorf("%d comparisons set; exactly one is permitted", set)
+		return fmt.Errorf("%d comparisons set; exactly one is permitted", n)
 	}
 }

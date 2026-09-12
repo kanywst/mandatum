@@ -151,6 +151,16 @@ func coversTags(parent, child []string) bool {
 // false: refusing a delegation the issuer believed was valid is recoverable,
 // and accepting one that widens authority is not.
 func condCovers(p, c mda.Condition) bool {
+	// An empty `in` matches nothing, so it is the narrowest restriction
+	// expressible and every parent in the fragment entails it. This is
+	// checked before the per-kind comparisons below, which compare like with
+	// like and would otherwise reject it under an `eq` or range parent — the
+	// specification says a delegator can always grant nothing on a key, and
+	// that has to hold whatever the parent restricted.
+	if c.In != nil && len(c.In) == 0 {
+		return p.InFragment()
+	}
+
 	switch {
 	case p.Equals != nil:
 		// Nothing is narrower than a fixed value except the same fixed value.

@@ -41,6 +41,14 @@ lint: ## Run golangci-lint
 license-check: ## Fail on dependency licenses outside the CNCF allowlist
 	./hack/check-licenses.sh
 
+.PHONY: translations
+translations: ## Re-stamp translations as current with their English source
+	./hack/translations.sh update
+
+.PHONY: translations-check
+translations-check: ## Report translations whose English source has changed
+	./hack/translations.sh check
+
 .PHONY: markdown
 markdown: ## Lint markdown
 	npx --yes markdownlint-cli2 "**/*.md"

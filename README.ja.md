@@ -6,7 +6,9 @@
 
 **AI エージェントのための検証可能な委任。** エージェントが行為する権限を、実在する人間を根とする署名済みの連鎖として表現します。連鎖は一段ごとに権限が狭まり、任意のリンク単位で失効でき、単発の呼び出しではなく行動の並び全体に対して評価され、改竄検知可能なログに記録されます。
 
-> **ステータス: 設計段階。** 仕様は起草済みで、レビューを受け付けています。実用可能な実装はまだありません。[ROADMAP.md](ROADMAP.md) を参照してください。読んで議論すべき対象は仕様です: [`docs/spec/delegation-assertion.ja.md`](docs/spec/delegation-assertion.ja.md)。
+> **ステータス: 初期。** フォーマット、検証器、署名層、発行器は一通り動き、実際の署名に対してテストされています。並び評価・監査ログ・AuthZEN への接続はまだ作られておらず、第三者によるセキュリティレビューも受けていません。それが実務上どういう意味かは [ROADMAP.md](ROADMAP.md) と[脅威モデル](docs/security/threat-model.md)（英語）にあります。
+>
+> 読んで議論すべき対象は仕様です: [`docs/spec/delegation-assertion.ja.md`](docs/spec/delegation-assertion.ja.md)。
 
 ---
 
@@ -76,7 +78,20 @@ Mandatum が埋めるのはその隙間です。それ以外はやりません�
 | [GOVERNANCE.md](GOVERNANCE.md) | ロール、投票、組織バランス（英語） |
 | [VERSIONING.md](VERSIONING.md) | セマンティックバージョニング、ワイヤフォーマットのバージョニング、非推奨化（英語） |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | 変更をマージするまで（英語） |
+| [CHANGELOG.md](CHANGELOG.md) | 各リリースの変更点と既知の限界（英語） |
 | [SECURITY.md](SECURITY.md) | 脆弱性の報告（英語） |
+| [脅威モデル](docs/security/threat-model.md) | 何を、誰から守るのか。何を前提にしているか。まだ守れていないもの（英語） |
+| [サプライチェーン](docs/security/supply-chain.md) | リリースの検証方法、CI が強制していること、既知の穴（英語） |
+
+## 試す
+
+人間がエージェントに委任し、そのエージェントがより狭い権限を再委任し、リソースサーバが届いたものを検証し、権限を広げようとする試みが拒否される — その全体が実行可能な例になっています。
+
+```bash
+go test -run Example ./pkg/issue/ -v
+```
+
+ソースは [`pkg/issue/example_test.go`](pkg/issue/example_test.go) で、このライブラリが何をするのかについて最も短く正直な説明です。
 
 ## コントリビュート
 
@@ -98,4 +113,4 @@ Issue と Pull Request は日本語で書いても構いません。ただしコ
 
 ---
 
-*翻訳元: `1413190`*
+*translated-from: sha-256:6ee8b68d41dd7e6e21bc11046c19950c008a6d432ea3f57d2bf4d35758fa17a2*
