@@ -245,7 +245,7 @@ The shape of `subject`, `action`, `resource` and `context.agent` is the COAZ-MCP
 
 The chain is verified **before** the PDP is called. The PDP receives a statement of fact ("this agent holds a valid chain rooted in this human") and applies organizational policy on top. Separating the two means an operator can change policy without changing credential handling, and a compromised PDP cannot manufacture authority that no sponsor granted.
 
-Where the OIDF COAZ-MCP binding (WG draft, June 2026) specifies a mapping from MCP tool calls to AuthZEN requests, Mandatum follows it rather than defining a parallel one. Divergences are tracked in `docs/spec/coaz-mcp-conformance.md`.
+Where the OIDF COAZ-MCP binding (WG draft, June 2026) specifies a mapping from MCP tool calls to AuthZEN requests, Mandatum follows it rather than defining a parallel one. What is implemented, what is not, and the one place the output goes beyond the binding are set out in [coaz-mcp-conformance.md](coaz-mcp-conformance.md).
 
 ## 9. Sequence-level evaluation
 
@@ -308,7 +308,9 @@ Every decision — allow and deny — appends one record to a tamper-evident log
 
 `policy_revision` is mandatory because without it a decision cannot be replayed: re-evaluating against today's policy answers a different question than the one the log records. The absence of this field in existing decision logs is the reason "why was this denied?" is currently unanswerable in practice.
 
-The log is an RFC 6962-style Merkle tree. Inclusion and consistency proofs let an auditor verify that no record was altered or removed. The EU AI Act's high-risk obligations, applicable since 2026-08-02, require immutable logging and traceable delegation chains; this section exists to satisfy that requirement, and the mapping is documented in `docs/compliance/eu-ai-act.md`.
+The log is an RFC 6962-style Merkle tree. Inclusion and consistency proofs let an auditor verify that no record was altered or removed.
+
+The EU AI Act's high-risk obligations, applicable since 2026-08-02, require immutable logging and traceable delegation chains, and this section is shaped by them. It does not satisfy them: none of it is built yet. A mapping from these obligations to what the implementation actually does is worth writing once there is an implementation to map, and not before.
 
 ## 11. Threat model
 

@@ -86,7 +86,7 @@ Until Mandatum has Maintainers from at least two organizations, §5.2 has no eff
 
 ### 5.4 Infrastructure neutrality
 
-Project infrastructure must not be owned by an individual or a company in a way that could be used as leverage. The following are held by the project and listed with their current custodian in `docs/project/infrastructure.md`:
+Project infrastructure must not be owned by an individual or a company in a way that could be used as leverage. Each piece below is listed with its current custodian, honestly including the ones held by an individual today, in [docs/project/infrastructure.md](docs/project/infrastructure.md):
 
 - the source repositories and their organization
 - the domain name and DNS
