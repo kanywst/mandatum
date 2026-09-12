@@ -150,6 +150,16 @@ func TestVerifyAcceptsAWellFormedChain(t *testing.T) {
 	if got.LeafID != "jti-agent-b" {
 		t.Errorf("leaf id = %q, want jti-agent-b", got.LeafID)
 	}
+	// Sequence history is kept under RootID. Keyed off the leaf instead,
+	// every sub-delegation would get a fresh history and the constraint the
+	// sequence package exists to enforce would be escapable by delegating.
+	// The two jtis differ in this chain precisely so that a mix-up fails.
+	if got.RootID != "jti-agent-a" {
+		t.Errorf("root id = %q, want jti-agent-a; sequence history would key off the wrong assertion", got.RootID)
+	}
+	if len(got.Actors) != 2 || got.Actors[0] != "agent-a" || got.Actors[1] != "agent-b" {
+		t.Errorf("actors = %v, want the chain from the sponsor's grantee to the acting agent", got.Actors)
+	}
 	if got.ChainDigest == "" {
 		t.Error("chain digest is empty; audit records could not be correlated")
 	}
@@ -161,8 +171,15 @@ func TestVerifyAcceptsASingleLink(t *testing.T) {
 	v := newTestVerifier(t, allowAll{}, noRevocations{})
 	c := chainOf(link(sponsorIss, "agent-a", 1, capability("mcp_tool", "search.query", "invoke"))).build()
 
-	if _, err := v.Verify(context.Background(), c); err != nil {
+	got, err := v.Verify(context.Background(), c)
+	if err != nil {
 		t.Fatalf("single-link chain rejected: %v", err)
+	}
+	// With one link the root is the leaf, which is the case a mix-up would
+	// pass. The two-hop test is what distinguishes them; this pins that a
+	// chain of one still reports both.
+	if got.RootID != "jti-agent-a" || got.LeafID != "jti-agent-a" {
+		t.Errorf("root %q / leaf %q, want both jti-agent-a", got.RootID, got.LeafID)
 	}
 }
 

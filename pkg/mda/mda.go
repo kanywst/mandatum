@@ -156,11 +156,23 @@ type Constraint struct {
 	After  ActionMatcher `json:"after"`
 }
 
-// ActionMatcher selects actions in a history by their tags and type.
+// ActionMatcher selects actions in a history by their tags and type. An
+// empty field matches anything, so a matcher with no fields set matches every
+// action.
 type ActionMatcher struct {
 	Action       string   `json:"action,omitempty"`
 	ResourceType string   `json:"resource.type,omitempty"`
 	ResourceTags []string `json:"resource.tags,omitempty"`
+}
+
+// MatchesEverything reports whether this matcher constrains nothing. Valid
+// for a constraint's Forbid ("after that, do nothing at all") and a trap for
+// its After, which Claims.Validate refuses.
+//
+// Exported so that evaluation uses this definition rather than its own copy.
+// If ActionMatcher gains a field, one place has to learn about it.
+func (m ActionMatcher) MatchesEverything() bool {
+	return m.Action == "" && m.ResourceType == "" && len(m.ResourceTags) == 0
 }
 
 // Assertion is one link as received, together with its parsed claims.
@@ -235,13 +247,42 @@ func (c Claims) Validate() error {
 		return fmt.Errorf("mda: mdt.cap is required; use an empty array to grant nothing")
 	}
 	if s := c.Mandatum.Sequence; s != nil {
+		// A negative budget is not merely malformed, it is an escape. Zero
+		// means unlimited, and every comparison that treats "unlimited" as
+		// zero reads a negative as unlimited too — including the attenuation
+		// check, where `child > parent` is false for any negative child. A
+		// child could then set -1 under a parent's budget of 100 and be
+		// unconstrained. Refused here so it never reaches that comparison.
+		if s.MaxInvocations < 0 {
+			return fmt.Errorf("mda: mdt.seq.max_invocations %d is negative; use 0 for unlimited",
+				s.MaxInvocations)
+		}
 		if s.MaxInvocations == 0 && len(s.Constraints) == 0 {
 			return fmt.Errorf("mda: mdt.seq is present but constrains nothing")
 		}
+		seen := make(map[string]struct{}, len(s.Constraints))
 		for i, con := range s.Constraints {
 			if con.ID == "" {
 				return fmt.Errorf("mda: mdt.seq.constraints[%d] has no id; "+
 					"a denial must be able to name the rule that fired", i)
+			}
+			if _, dup := seen[con.ID]; dup {
+				// Two rules under one name make the trigger state ambiguous:
+				// which of them fired, and which does a denial refer to?
+				return fmt.Errorf("mda: mdt.seq.constraints[%d]: id %q appears more than once", i, con.ID)
+			}
+			seen[con.ID] = struct{}{}
+
+			// An empty trigger is a trap. A constraint says "once X has
+			// happened", so an empty X needs some action to have happened
+			// first and takes effect from the second action rather than the
+			// first, which is not what whoever wrote it meant. Checked here,
+			// in the structural validator, so that issuance refuses it too
+			// rather than only the evaluator catching it later.
+			if con.After.MatchesEverything() {
+				return fmt.Errorf("mda: mdt.seq.constraints[%d]: constraint %q has an empty trigger; "+
+					"a sequence rule fires after something, so this would take effect from the second "+
+					"action, not the first. To forbid an action outright, leave it out of mdt.cap", i, con.ID)
 			}
 		}
 	}

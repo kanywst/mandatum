@@ -6,7 +6,7 @@
 
 **AI エージェントのための検証可能な委任。** エージェントが行為する権限を、実在する人間を根とする署名済みの連鎖として表現します。連鎖は一段ごとに権限が狭まり、任意のリンク単位で失効でき、単発の呼び出しではなく行動の並び全体に対して評価され、改竄検知可能なログに記録されます。
 
-> **ステータス: 初期。** フォーマット、検証器、署名層、発行器は一通り動き、実際の署名に対してテストされています。並び評価・監査ログ・AuthZEN への接続はまだ作られておらず、第三者によるセキュリティレビューも受けていません。それが実務上どういう意味かは [ROADMAP.md](ROADMAP.md) と[脅威モデル](docs/security/threat-model.md)（英語）にあります。
+> **ステータス: 初期。** フォーマット、検証器、署名層、発行器は一通り動き、実際の署名に対してテストされています。AuthZEN バインディングと並び評価も動きます。監査ログは未実装、並び状態のストアはプロセス内のみ、第三者によるセキュリティレビューも受けていません。それが実務上どういう意味かは [ROADMAP.md](ROADMAP.md) と[脅威モデル](docs/security/threat-model.md)（英語）にあります。
 >
 > 読んで議論すべき対象は仕様です: [`docs/spec/delegation-assertion.ja.md`](docs/spec/delegation-assertion.ja.md)。
 
@@ -26,30 +26,64 @@ Model Context Protocol は自身の認可がどこで止まるかを明示して
 
 Mandatum が埋めるのはその隙間です。それ以外はやりません。
 
-## 全体像
+## 動きかた
 
-```text
-  human sponsor  ──── 認証済み、実名、すべての根
-       │
-       ├─ MDA₀   付与: search.query on {public, docs}, 1h, max_depth 3
-       │
-       └─ agent A
-            │
-            ├─ MDA₁   付与: search.query on {public}, 40m, max_depth 2
-            │         ↑ 親より狭い。広げることはできない
-            │
-            └─ agent B
-                 │
-                 └─ MCP tool call ──▶ [ PEP ]
-                                        │  1. 連鎖をオフラインで検証
-                                        │  2. ここまでの並びを確認
-                                        │  3. AuthZEN PDP に問い合わせ
-                                        │  4. 監査ログに追記
-                                        ▼
-                                    allow / deny + 対処可能な理由
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Human as 👤 Alice
+    participant IdP as Identity Provider
+    participant A as 🤖 planner
+    participant B as 🤖 retriever
+    participant PEP as MCP server · PEP
+    participant PDP as AuthZEN PDP
+
+    rect rgba(130,170,255,0.12)
+    Note over Human,A: 委任 · 権限は狭まる一方
+    Human->>IdP: 認証 (パスワード + ハードウェアキー)
+    IdP-->>A: MDA₀ · search.* · 1h · 残り2ホップ
+    A-->>B: MDA₁ · search.query · 40m · 残り1ホップ
+    Note right of B: 広げられない: 試みたリンクは<br/>検証器が拒否する
+    end
+
+    rect rgba(120,220,170,0.12)
+    Note over B,PDP: 強制 · ツールが動く前に、毎回
+    B->>PEP: tools/call search.query + 連鎖 [MDA₀, MDA₁]
+    PEP->>PEP: 連鎖をオフライン検証 (V1〜V9)
+    PEP->>PEP: 連鎖の履歴を確認
+    PEP->>PDP: subject = Alice · agent = retriever
+    PDP-->>PEP: allow
+    PEP-->>B: 結果
+    end
+
+    rect rgba(255,150,150,0.12)
+    Note over B,PEP: 呼び出し単位のチェックには見えない組
+    B->>PEP: tools/call fetch(外部URL)
+    PEP-->>B: 許可
+    B->>PEP: tools/call write(内部レコード)
+    PEP--xB: 拒否 · no-write-after-external-read
+    end
 ```
 
-`MDA₁` を失効させると agent B は即座に権限を失い、B が下位に委任したものもすべて道連れになります。すべての子孫が親をハッシュでコミットしているからです。agent A と兄弟の連鎖には一切影響しません。
+3 が残りすべてを成り立たせている性質です。すべてのリンクが親をハッシュでコミットし、狭める方向にしか動けないので、下りながら権限が増えることはありません。`MDA₁` を失効させると agent B は、自分が下位に委任したものも含めてすべてを失います。agent A と兄弟の連鎖は影響を受けません。
+
+12 が他のどこもやっていないものです。どちらの呼び出しも個別には認可されています。その組が情報漏洩であり、1呼び出しずつ見るチェックには判別できません。
+
+## 3つの使いどころ
+
+**Pull Request を開けるコーディングエージェント。** 依存パッケージの README、issue コメント、フォークからの diff を読みます。どれも攻撃者が書き込めます。そのあと push します。読み取りに `external-content`、push に `mutating` のタグを付ければ、前者のあとで後者が止まります。
+
+```json
+{ "id": "no-push-after-third-party-read",
+  "forbid": { "resource.tags": ["mutating"] },
+  "after":  { "resource.tags": ["external-content"] } }
+```
+
+**返金を発行できるサポートエージェント。** 顧客のメッセージは攻撃者が制御できるテキストで、返金ツールは金を動かします。形は同じで、スポンサーはそのセッションを承認したエンジニアなので、監査記録には `svc-support-bot` ではなく人間の名前が載ります。
+
+**動かしっぱなしにされた調査エージェント。** スポンサー付与の `max_invocations` が連鎖全体を上限で止めます。状態は連鎖の根で鍵付けされているので、子エージェントを10個生やしても消費するのは同じ予算1つです。
+
+これらのどれにも新しいポリシーエンジンは要りません。必要なのは、ツール呼び出しが「同じ権限のもとで先に何が起きたか」を知っていることです。
 
 ## これは何ではないか
 
@@ -113,4 +147,4 @@ Issue と Pull Request は日本語で書いても構いません。ただしコ
 
 ---
 
-*translated-from: sha-256:6ee8b68d41dd7e6e21bc11046c19950c008a6d432ea3f57d2bf4d35758fa17a2*
+*translated-from: sha-256:f4c1c36f4c9850f9c474d784c12c08b6afe18ea55ce0b7fd20f273fc55dad8bb*

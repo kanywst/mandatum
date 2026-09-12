@@ -6,7 +6,7 @@
 
 **Verifiable delegation for AI agents.** An agent's authority to act becomes a signed chain rooted in a named human — attenuating at every hop, revocable at any link, evaluated across whole action sequences, and recorded in a tamper-evident log.
 
-> **Status: early.** The format, the verifier, the signing layer and the issuer work end to end and are tested against real signatures. Sequence evaluation, the audit log and the AuthZEN binding are not built yet, and nothing here has had a third-party security review. See [ROADMAP.md](ROADMAP.md) and the [threat model](docs/security/threat-model.md) for what that means in practice.
+> **Status: early.** The format, the verifier, the signing layer and the issuer work end to end and are tested against real signatures. The AuthZEN binding and sequence evaluation work too. The audit log is not built, the sequence store is in-process only, and nothing here has had a third-party security review. See [ROADMAP.md](ROADMAP.md) and the [threat model](docs/security/threat-model.md) for what that means in practice.
 >
 > The specification is the thing to read and argue with: [`docs/spec/delegation-assertion.md`](docs/spec/delegation-assertion.md).
 
@@ -26,30 +26,64 @@ The Model Context Protocol says where its own authorization stops: it is defined
 
 That gap is what Mandatum fills. Nothing else.
 
-## The shape of it
+## How it works
 
-```text
-  human sponsor  ──── authenticated, named, at the root of everything
-       │
-       ├─ MDA₀   grants: search.query on {public, docs}, 1h, max_depth 3
-       │
-       └─ agent A
-            │
-            ├─ MDA₁   grants: search.query on {public}, 40m, max_depth 2
-            │         ↑ narrower than its parent. It cannot be wider.
-            │
-            └─ agent B
-                 │
-                 └─ MCP tool call ──▶ [ PEP ]
-                                        │  1. verify the chain, offline
-                                        │  2. check the sequence so far
-                                        │  3. ask an AuthZEN PDP
-                                        │  4. append to the audit log
-                                        ▼
-                                    allow / deny + a reason you can act on
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Human as 👤 Alice
+    participant IdP as Identity Provider
+    participant A as 🤖 planner
+    participant B as 🤖 retriever
+    participant PEP as MCP server · PEP
+    participant PDP as AuthZEN PDP
+
+    rect rgba(130,170,255,0.12)
+    Note over Human,A: delegation · authority only ever narrows
+    Human->>IdP: authenticate (password + hardware key)
+    IdP-->>A: MDA₀ · search.* · 1h · 2 hops left
+    A-->>B: MDA₁ · search.query · 40m · 1 hop left
+    Note right of B: cannot widen: the verifier<br/>rejects a link that tries
+    end
+
+    rect rgba(120,220,170,0.12)
+    Note over B,PDP: enforcement · before the tool runs, every call
+    B->>PEP: tools/call search.query + chain [MDA₀, MDA₁]
+    PEP->>PEP: verify chain, offline (V1–V9)
+    PEP->>PEP: check the chain's history
+    PEP->>PDP: subject = Alice · agent = retriever
+    PDP-->>PEP: allow
+    PEP-->>B: result
+    end
+
+    rect rgba(255,150,150,0.12)
+    Note over B,PEP: the pair no per-call check can see
+    B->>PEP: tools/call fetch(external URL)
+    PEP-->>B: allowed
+    B->>PEP: tools/call write(internal record)
+    PEP--xB: denied · no-write-after-external-read
+    end
 ```
 
-Revoke `MDA₁` and agent B loses its authority immediately, along with anything B delegated onward — because every descendant commits to its parent by hash. Agent A and every sibling chain are untouched.
+Step 3 is the property that makes the rest work: every link commits to its parent by hash and may only narrow, so authority cannot grow on the way down. Revoke `MDA₁` and agent B loses everything, including whatever it delegated onward. Agent A and every sibling chain are untouched.
+
+Step 12 is the one nothing else does. Both calls are individually authorized. The pair is the exfiltration, and a check that sees one call at a time cannot tell.
+
+## Three places this fits
+
+**A coding agent that can open pull requests.** It reads a dependency's README, an issue comment, a diff from a fork: all attacker-writable. Then it pushes. Tag the reads `external-content` and the push `mutating`, and the second one stops after the first.
+
+```json
+{ "id": "no-push-after-third-party-read",
+  "forbid": { "resource.tags": ["mutating"] },
+  "after":  { "resource.tags": ["external-content"] } }
+```
+
+**A support agent that can issue credits.** The customer's message is attacker-controlled text and the refund tool moves money. Same shape, and the sponsor is the engineer who approved the session, so the audit record names a person rather than `svc-support-bot`.
+
+**A research agent someone left running.** `max_invocations` on the sponsor's grant caps the whole chain. Because state is keyed by the chain root, spawning ten sub-agents spends the same budget rather than ten of them.
+
+None of these need a new policy engine. They need the tool call to know what happened earlier under the same authority.
 
 ## What this is not
 

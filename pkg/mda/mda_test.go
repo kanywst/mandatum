@@ -92,6 +92,26 @@ func TestValidateRejects(t *testing.T) {
 			"constrains nothing",
 		},
 		{
+			"a constraint whose trigger matches everything",
+			func(c *Claims) {
+				c.Mandatum.Sequence = &Sequence{Constraints: []Constraint{{
+					ID:     "nothing-mutating-ever",
+					Forbid: ActionMatcher{ResourceTags: []string{"mutating"}},
+				}}}
+			},
+			"empty trigger",
+		},
+		{
+			"two constraints under one id",
+			func(c *Claims) {
+				c.Mandatum.Sequence = &Sequence{Constraints: []Constraint{
+					{ID: "a", After: ActionMatcher{Action: "read"}},
+					{ID: "a", After: ActionMatcher{Action: "write"}},
+				}}
+			},
+			"more than once",
+		},
+		{
 			"constraint without an id",
 			func(c *Claims) {
 				c.Mandatum.Sequence = &Sequence{Constraints: []Constraint{{

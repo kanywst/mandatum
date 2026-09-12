@@ -237,12 +237,16 @@ func seqNoWider(parent, child *mda.Sequence) error {
 	}
 
 	// MaxInvocations of 0 means unlimited, so a child may only be 0 if the
-	// parent was.
+	// parent was. Anything non-positive is treated the same way: structural
+	// validation refuses a negative budget before this runs, and this does
+	// not rely on that, because "child > parent" is false for every negative
+	// child and a comparison that reads -1 as narrower is an escape.
 	switch {
-	case parent.MaxInvocations == 0:
+	case parent.MaxInvocations <= 0:
 		// Parent unlimited: any child budget narrows.
-	case child.MaxInvocations == 0:
-		return fmt.Errorf("removes the parent's invocation budget of %d", parent.MaxInvocations)
+	case child.MaxInvocations <= 0:
+		return fmt.Errorf("removes the parent's invocation budget of %d (child budget %d)",
+			parent.MaxInvocations, child.MaxInvocations)
 	case child.MaxInvocations > parent.MaxInvocations:
 		return fmt.Errorf("raises the invocation budget from %d to %d",
 			parent.MaxInvocations, child.MaxInvocations)
