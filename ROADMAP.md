@@ -47,10 +47,11 @@ Gates: fuzzing runs clean for 24 hours; every specification rule has a correspon
 
 ### v0.2 — AuthZEN and MCP binding (2027 Q1)
 
-- AuthZEN Authorization API 1.0 client
-- Mapping from a verified chain to an evaluation request
-- MCP tool-call enforcement middleware
-- Conformance against the COAZ-MCP working group draft, with divergences documented rather than hidden
+- ~~AuthZEN Authorization API 1.0 client~~ done
+- ~~Mapping from a verified chain to an evaluation request~~ done
+- ~~Conformance against the COAZ-MCP working group draft, with divergences documented rather than hidden~~ done, for the `tools/call` default mapping only
+- MCP tool-call enforcement middleware: the mapping exists, the middleware that calls it does not
+- Declared mappings and CEL, which the binding defines and this does not read
 - Interoperability tested against at least three independent PDP implementations
 
 Gates: works against three PDPs from different vendors with no implementation-specific code paths.
