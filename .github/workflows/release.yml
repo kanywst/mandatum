@@ -1,0 +1,109 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: verify the tag before publishing anything
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - run: make build
+      - run: make test
+      - name: Dependency licenses
+        run: |
+          go install github.com/google/go-licenses@latest
+          make license-check
+      - name: Tag is described in the changelog
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          if ! grep -qF "[${version}]" CHANGELOG.md; then
+            echo "CHANGELOG.md has no entry for ${version}."
+            echo "A release nobody wrote down is a release nobody can audit."
+            exit 1
+          fi
+
+  release:
+    name: publish
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write   # cosign keyless signing via Sigstore
+      attestations: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+
+      - name: Build the source archive
+        run: |
+          mkdir -p dist
+          git archive --format=tar.gz --prefix="mandatum-${GITHUB_REF_NAME}/" \
+            -o "dist/mandatum-${GITHUB_REF_NAME}.tar.gz" "${GITHUB_REF_NAME}"
+
+      - name: Generate an SBOM
+        uses: anchore/sbom-action@v0
+        with:
+          format: spdx-json
+          output-file: dist/mandatum-sbom.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum ./* > checksums.txt
+
+      - uses: sigstore/cosign-installer@v4
+
+      - name: Sign the checksums
+        # Signing the checksum file transitively covers every artifact, and
+        # keeps one signature to verify rather than one per file.
+        run: |
+          cosign sign-blob --yes \
+            --output-signature dist/checksums.txt.sig \
+            --output-certificate dist/checksums.txt.pem \
+            dist/checksums.txt
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v3
+        with:
+          subject-path: 'dist/mandatum-*.tar.gz'
+
+      - name: Publish
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          body: |
+            Verify this release before using it:
+
+            ```bash
+            cosign verify-blob \
+              --certificate checksums.txt.pem \
+              --signature checksums.txt.sig \
+              --certificate-identity-regexp 'https://github.com/kanywst/mandatum/.github/workflows/release.yml@.*' \
+              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+              checksums.txt
+
+            sha256sum -c checksums.txt
+            ```
+
+            An SPDX SBOM is attached. Build provenance is attested and can be
+            checked with `gh attestation verify`.
+
+            See CHANGELOG.md for what changed, including which Delegation
+            Assertion format versions this release accepts and issues.

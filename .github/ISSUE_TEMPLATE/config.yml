@@ -1,0 +1,14 @@
+blank_issues_enabled: true
+
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/kanywst/mandatum/security/advisories/new
+    about: >-
+      Do not open a public issue for a vulnerability. Use private
+      reporting; response targets are in SECURITY.md.
+
+  - name: Review the specification
+    url: https://github.com/kanywst/mandatum/blob/main/docs/spec/delegation-assertion.md
+    about: >-
+      The most useful contribution right now is disagreement with the design.
+      Section 12 lists what is genuinely unresolved.

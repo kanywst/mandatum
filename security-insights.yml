@@ -1,0 +1,129 @@
+# OpenSSF Security Insights
+# https://github.com/ossf/security-insights-spec
+#
+# Machine-readable security posture. CNCF's CLOMonitor reads this file, and it
+# lets a prospective adopter answer "how is this project run?" without opening
+# an issue to ask.
+
+header:
+  schema-version: 1.0.0
+  expiration-date: '2027-09-12T00:00:00.000Z'
+  last-updated: '2026-09-12'
+  last-reviewed: '2026-09-12'
+  project-url: https://github.com/kanywst/mandatum
+  license: https://github.com/kanywst/mandatum/blob/main/LICENSE
+  changelog: https://github.com/kanywst/mandatum/blob/main/CHANGELOG.md
+
+project-lifecycle:
+  status: concept
+  roadmap: https://github.com/kanywst/mandatum/blob/main/ROADMAP.md
+  bug-fixes-only: false
+  core-maintainers:
+    - https://github.com/kanywst
+  release-cycle: https://github.com/kanywst/mandatum/blob/main/VERSIONING.md
+  release-process: |
+    Releases are cut from a signed tag. CI rebuilds, re-tests, re-checks
+    dependency licenses, and refuses to publish a tag that the changelog does
+    not describe. Artifacts are checksummed, the checksum file is signed with
+    cosign keyless, an SPDX SBOM is attached, and build provenance is attested.
+
+contribution-policy:
+  accepts-pull-requests: true
+  accepts-automated-pull-requests: true
+  code-of-conduct: https://github.com/kanywst/mandatum/blob/main/CODE_OF_CONDUCT.md
+  contributing-policy: https://github.com/kanywst/mandatum/blob/main/CONTRIBUTING.md
+
+documentation:
+  - https://github.com/kanywst/mandatum/blob/main/docs/spec/delegation-assertion.md
+  - https://github.com/kanywst/mandatum/blob/main/docs/alternatives.md
+
+distribution-points:
+  - https://github.com/kanywst/mandatum/releases
+  - pkg:golang/github.com/kanywst/mandatum
+
+security-artifacts:
+  threat-model:
+    threat-model-created: false
+    comment: |
+      The specification carries a summary threat model in section 11. The full
+      model is scheduled for v0.1; see docs/README.md.
+  self-assessment:
+    self-assessment-created: false
+    comment: |
+      A CNCF-style self-assessment will be written before any foundation
+      application, not retrofitted to one.
+
+security-testing:
+  - tool-type: sca
+    tool-name: govulncheck
+    tool-version: latest
+    integration:
+      ad-hoc: true
+      ci: true
+      before-release: true
+    comment: Known-vulnerability scanning of the Go dependency graph, weekly and on change.
+  - tool-type: sast
+    tool-name: CodeQL
+    tool-version: latest
+    integration:
+      ad-hoc: false
+      ci: true
+      before-release: false
+    comment: security-extended query suite.
+  - tool-type: fuzzing
+    tool-name: go test -fuzz
+    tool-version: latest
+    integration:
+      ad-hoc: true
+      ci: true
+      before-release: true
+    comment: |
+      Assertion parsing and chain verification are fuzzed on every pull
+      request. These run on the enforcement path against attacker-influenced
+      input, so a panic there is a denial of service on protected calls.
+  - tool-type: sca
+    tool-name: go-licenses
+    tool-version: latest
+    integration:
+      ad-hoc: true
+      ci: true
+      before-release: true
+    comment: |
+      Transitive dependency licenses are checked against the CNCF allowlist,
+      weekly and on change.
+
+security-assessments:
+  - auditor-name: none yet
+    auditor-url: https://github.com/kanywst/mandatum/blob/main/ROADMAP.md
+    auditor-report: https://github.com/kanywst/mandatum/blob/main/ROADMAP.md
+    report-year: 2026
+    comment: |
+      No third-party security review has been performed. One is a required
+      gate for v1.0 and this entry will be replaced when it happens. Until
+      then, treat the verifier as unreviewed.
+
+security-contacts:
+  - type: website
+    value: https://github.com/kanywst/mandatum/security/advisories/new
+    primary: true
+
+vulnerability-reporting:
+  accepts-vulnerability-reports: true
+  email-contact: ''
+  security-policy: https://github.com/kanywst/mandatum/blob/main/SECURITY.md
+  bug-bounty-available: false
+  comment: |
+    Report through GitHub private vulnerability reporting. Response targets
+    are in SECURITY.md. Coordinated disclosure, default 90 days.
+
+dependencies:
+  third-party-packages: false
+  dependencies-lifecycle:
+    policy-url: https://github.com/kanywst/mandatum/blob/main/CONTRIBUTING.md
+    comment: |
+      The verification core deliberately depends only on the Go standard
+      library. Adding a dependency requires justification in the pull request
+      and its license must be on the CNCF allowlist, transitively.
+  env-dependencies-policy:
+    policy-url: https://github.com/kanywst/mandatum/blob/main/CONTRIBUTING.md
+    comment: Dependabot proposes updates weekly; majors are reviewed individually.

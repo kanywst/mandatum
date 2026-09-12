@@ -1,0 +1,59 @@
+name: Specification feedback
+description: Disagree with the design, or report something it cannot express
+labels: [spec]
+body:
+  - type: markdown
+    attributes:
+      value: >-
+        This is the most valuable kind of issue right now. A design flaw found
+        before there are adopters costs a document edit; found after, it costs
+        a migration.
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of feedback is this?
+      options:
+        - A rule is unsound or can be bypassed
+        - A rule is too strict and rejects something legitimate
+        - The specification cannot express a real scenario
+        - Something is ambiguous or underspecified
+        - This already exists elsewhere and should not be built
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: section
+    attributes:
+      label: Which section?
+      placeholder: "e.g. §6.1 capability entailment, or V5"
+
+  - type: textarea
+    id: detail
+    attributes:
+      label: What is wrong
+      description: >-
+        Be concrete. For an unsoundness, the most useful form is a chain that
+        should be rejected and is not, or the reverse. A working exploit is
+        not required — a precise description is enough.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scenario
+    attributes:
+      label: The deployment behind it, if any
+      description: >-
+        A real agent deployment and what you could not express carries more
+        weight than a hypothetical, and shapes the fix differently.
+
+  - type: checkboxes
+    id: security
+    attributes:
+      label: Confirm
+      options:
+        - label: >-
+            This is not a vulnerability in a released version. Those go to
+            private reporting, not here.
+          required: true

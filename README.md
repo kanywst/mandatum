@@ -1,5 +1,12 @@
 # Mandatum
 
+[![ci](https://github.com/kanywst/mandatum/actions/workflows/ci.yml/badge.svg)](https://github.com/kanywst/mandatum/actions/workflows/ci.yml)
+[![security](https://github.com/kanywst/mandatum/actions/workflows/security.yml/badge.svg)](https://github.com/kanywst/mandatum/actions/workflows/security.yml)
+[![licenses](https://github.com/kanywst/mandatum/actions/workflows/licenses.yml/badge.svg)](https://github.com/kanywst/mandatum/actions/workflows/licenses.yml)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/kanywst/mandatum/badge)](https://scorecard.dev/viewer/?uri=github.com/kanywst/mandatum)
+[![Go Reference](https://pkg.go.dev/badge/github.com/kanywst/mandatum.svg)](https://pkg.go.dev/github.com/kanywst/mandatum)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+
 **Verifiable delegation for AI agents.** An agent's authority to act becomes a
 signed chain rooted in a named human — attenuating at every hop, revocable at
 any link, evaluated across whole action sequences, and recorded in a
@@ -107,8 +114,11 @@ gets built. Please open an issue — see [`docs/alternatives.md`](docs/alternati
 | [`docs/alternatives.md`](docs/alternatives.md) | What else exists and why it does not close this gap |
 | [ROADMAP.md](ROADMAP.md) | Both tracks, with gates |
 | [GOVERNANCE.md](GOVERNANCE.md) | Roles, voting, organizational balance |
+| [VERSIONING.md](VERSIONING.md) | Semantic versioning, wire-format versioning, deprecation |
+| [CHANGELOG.md](CHANGELOG.md) | What changed, and the known limitations of each release |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to get a change merged |
 | [SECURITY.md](SECURITY.md) | Reporting a vulnerability |
+| [Supply chain](docs/security/supply-chain.md) | How to verify a release, what CI enforces, and the known gaps |
 
 ## Contributing
 

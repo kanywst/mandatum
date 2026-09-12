@@ -49,8 +49,15 @@ markdown: ## Lint markdown
 tidy: ## Tidy and verify module dependencies
 	$(GO) mod tidy
 	$(GO) mod verify
-	@git diff --exit-code go.mod go.sum \
-		|| { echo "go.mod or go.sum changed; commit the result of 'make tidy'"; exit 1; }
+	@# porcelain rather than 'git diff', so this works before go.sum exists
+	@# (a module with no dependencies has none) and still catches tidy
+	@# creating one for the first time.
+	@changed="$$(git status --porcelain -- go.mod go.sum)"; \
+	if [ -n "$$changed" ]; then \
+		echo "go.mod or go.sum changed; commit the result of 'make tidy':"; \
+		echo "$$changed"; \
+		exit 1; \
+	fi
 
 .PHONY: verify
 verify: build test lint license-check markdown ## Everything CI runs, in CI's order
