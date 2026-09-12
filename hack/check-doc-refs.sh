@@ -18,8 +18,15 @@ set -euo pipefail
 readonly PLANNED_SOURCE="docs/README.md"
 
 # Markdown reference forms this looks at:
-#   [text](path/to/doc.md)      relative to the referring file
+#   [text](path/to/doc.md)      relative to the referring file, or to the
+#                               repository root when it starts with "/"
 #   `path/to/doc.md`            relative to the repository root
+#
+# The two are held to different standards, deliberately. A link must resolve,
+# always: a link to an unwritten document renders as a clickable dead end, and
+# declaring it Planned somewhere else does not help the reader who clicked it.
+# A mention in prose may point at a document declared Planned, because "this
+# will be recorded in X" is a legitimate thing to write about work not done.
 #
 # Fenced code blocks are stripped first: a sample command containing a path is
 # an illustration, not a reference.
@@ -84,9 +91,22 @@ while IFS= read -r file; do
     case "$target" in http://*|https://*|mailto:*) continue ;; esac
     is_glob "$target" && continue
     checked=$((checked + 1))
-    [ -e "$dir/$target" ] && continue
+
+    # GitHub resolves a leading slash against the repository root. Resolving
+    # it against the referring directory instead produces a path that may
+    # happen to exist, which would accept a broken link silently.
+    case "$target" in
+      /*) resolved=".${target}" ;;
+      *)  resolved="$dir/$target" ;;
+    esac
+    [ -e "$resolved" ] && continue
+
     echo "::error file=${file#./}::links to $target, which does not exist"
     echo "broken link: ${file#./} -> $target"
+    if is_planned "${target#/}"; then
+      echo "  It is listed as Planned, which permits mentioning it in prose but not linking to it:"
+      echo "  a link renders as a clickable dead end whatever the table says."
+    fi
     problems=$((problems + 1))
   done <<< "$linked"
 
