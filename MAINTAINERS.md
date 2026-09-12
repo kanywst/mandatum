@@ -1,11 +1,8 @@
 # Maintainers
 
-Maintainer roles, nomination, and the organizational-balance rules that apply
-to this list are defined in [GOVERNANCE.md](GOVERNANCE.md).
+Maintainer roles, nomination, and the organizational-balance rules that apply to this list are defined in [GOVERNANCE.md](GOVERNANCE.md).
 
-The Company column records each Maintainer's employer. It is used to compute
-the organizational voting cap in GOVERNANCE.md §5.2, so Maintainers must keep
-it current within thirty days of any change.
+The Company column records each Maintainer's employer. It is used to compute the organizational voting cap in GOVERNANCE.md §5.2, so Maintainers must keep it current within thirty days of any change.
 
 ## Current Maintainers
 
@@ -19,13 +16,11 @@ None.
 
 ## Reviewers and Approvers
 
-Area-scoped Reviewers and Approvers are recorded in `OWNERS` files alongside
-the code they cover. There are none yet.
+Area-scoped Reviewers and Approvers are recorded in `OWNERS` files alongside the code they cover. There are none yet.
 
 ## Security Response Team
 
-Members of the Security Response Team and the process they follow are
-documented in [SECURITY.md](SECURITY.md).
+Members of the Security Response Team and the process they follow are documented in [SECURITY.md](SECURITY.md).
 
 | Name | GitHub ID |
 | --- | --- |
@@ -33,7 +28,4 @@ documented in [SECURITY.md](SECURITY.md).
 
 ## Note on organizational diversity
 
-Mandatum currently has Maintainers from one organization. Per
-[GOVERNANCE.md](GOVERNANCE.md) §5.3 the project states this rather than
-obscuring it, and treats adding Maintainers from a second organization as a
-release-blocking goal for v1.0. See [ROADMAP.md](ROADMAP.md).
+Mandatum currently has Maintainers from one organization. Per [GOVERNANCE.md](GOVERNANCE.md) §5.3 the project states this rather than obscuring it, and treats adding Maintainers from a second organization as a release-blocking goal for v1.0. See [ROADMAP.md](ROADMAP.md).

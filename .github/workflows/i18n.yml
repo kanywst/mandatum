@@ -1,0 +1,66 @@
+name: i18n
+
+# A stale translation is more dangerous than a missing one, because a reader
+# cannot tell the difference. This flags a pull request that changes an
+# English document without touching its translations.
+#
+# Advisory only. An English correction must not wait for a translator, and a
+# maintainer who does not speak the language should still be able to fix a
+# typo. The job always succeeds; it leaves an annotation and a summary.
+
+on:
+  pull_request:
+    paths:
+      - '**.md'
+
+permissions:
+  contents: read
+
+jobs:
+  translation-drift:
+    name: translations track their source
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Compare changed English documents against their translations
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          changed=$(git diff --name-only "$BASE" "$HEAD" -- '*.md')
+          stale=0
+
+          {
+            echo "## Translation drift"
+            echo
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          for f in $changed; do
+            # Skip translations themselves: "docs/x.ja.md" has two dots.
+            case "$(basename "$f")" in
+              *.*.md) continue ;;
+            esac
+
+            base="${f%.md}"
+            for t in "$base".*.md; do
+              [ -e "$t" ] || continue
+              if ! echo "$changed" | grep -qxF "$t"; then
+                echo "::warning file=$t::$f changed but $t did not. If the change is substantive, update the translation or open an issue; see docs/i18n.md."
+                echo "- \`$f\` changed, \`$t\` did not" >> "$GITHUB_STEP_SUMMARY"
+                stale=$((stale + 1))
+              fi
+            done
+          done
+
+          if [ "$stale" -eq 0 ]; then
+            echo "No translation drift detected." >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo
+              echo "$stale translation(s) may be stale. This does not block the merge."
+              echo "Translations record the commit they were made from; see docs/i18n.md."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
