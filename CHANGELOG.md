@@ -6,7 +6,15 @@ Each release also records which Delegation Assertion format versions (`mdt.v`) i
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- `pkg/authzen`: an OpenID AuthZEN Authorization API 1.0 client and the mapping from a verified chain onto an Access Evaluation request, following the COAZ-MCP default mapping for `tools/call`. PDP metadata discovery included, with the mix-up check the PDP identifier exists for.
+- `verify.Result.Actors`: the principals a chain's authority passed through, from the sponsor's grantee to the acting agent.
+
+### Changed
+
+- The specification's AuthZEN example now matches the COAZ-MCP binding: the human sponsor is `subject`, the acting agent is `context.agent`, and the rest of the chain sits under a vendor-prefixed context key because the binding leaves upstream actors undefined rather than forbidding them. The previous example invented `subject.type: "agent"` and `resource.type: "mcp_tool"`, which is exactly the parallel mapping the non-goals say not to define.
+- The Japanese specification and README caught up with changes made to the English originals after they were translated. The drift check only runs on pull requests, and those changes went straight to `main`.
 
 ## [0.1.0-rc.2] - 2026-09-12
 
