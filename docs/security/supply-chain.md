@@ -17,7 +17,7 @@ Signature verification and revocation lookup are interfaces precisely so that a 
 | `mandatum-vX.Y.Z.tar.gz` | Source archive built from the signed tag. |
 | `mandatum-sbom.spdx.json` | SPDX SBOM. |
 | `checksums.txt` | SHA-256 of every artifact. |
-| `checksums.txt.sig`, `checksums.txt.pem` | Cosign keyless signature and certificate. |
+| `checksums.txt.bundle` | Cosign keyless signature and certificate, as a Sigstore bundle. |
 | Build provenance attestation | Attests which workflow, at which commit, produced the archive. |
 
 Only the checksum file is signed. It transitively covers every artifact, and leaves one signature to verify rather than one per file.
@@ -26,8 +26,7 @@ Only the checksum file is signed. It transitively covers every artifact, and lea
 
 ```bash
 cosign verify-blob \
-  --certificate checksums.txt.pem \
-  --signature checksums.txt.sig \
+  --bundle checksums.txt.bundle \
   --certificate-identity-regexp 'https://github.com/kanywst/mandatum/.github/workflows/release.yml@.*' \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   checksums.txt

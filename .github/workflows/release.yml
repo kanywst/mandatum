@@ -93,10 +93,15 @@ jobs:
       - name: Sign the checksums
         # Signing the checksum file transitively covers every artifact, and
         # keeps one signature to verify rather than one per file.
+        #
+        # A Sigstore bundle rather than a separate .sig and .pem: cosign v3
+        # deprecated those flags and, with the new bundle format, ignores
+        # them. On v0.1.0-rc.1 that surfaced as an outright error, because
+        # --bundle then defaulted to an empty path. Had it not, the step
+        # would have gone green having written no signature.
         run: |
           cosign sign-blob --yes \
-            --output-signature dist/checksums.txt.sig \
-            --output-certificate dist/checksums.txt.pem \
+            --bundle dist/checksums.txt.bundle \
             dist/checksums.txt
 
       - name: Attest build provenance
@@ -118,8 +123,7 @@ jobs:
 
           ```bash
           cosign verify-blob \
-            --certificate checksums.txt.pem \
-            --signature checksums.txt.sig \
+            --bundle checksums.txt.bundle \
             --certificate-identity-regexp 'https://github.com/kanywst/mandatum/.github/workflows/release.yml@.*' \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             checksums.txt
