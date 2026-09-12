@@ -49,6 +49,10 @@ translations: ## Re-stamp translations as current with their English source
 translations-check: ## Report translations whose English source has changed
 	./hack/translations.sh check
 
+.PHONY: doc-refs
+doc-refs: ## Fail on references to documents that do not exist
+	./hack/check-doc-refs.sh
+
 .PHONY: markdown
 markdown: ## Lint markdown
 	npx --yes markdownlint-cli2 "**/*.md"
@@ -68,7 +72,7 @@ tidy: ## Tidy and verify module dependencies
 	fi
 
 .PHONY: verify
-verify: build test lint license-check markdown ## Everything CI runs, in CI's order
+verify: build test lint license-check markdown doc-refs translations-check ## Everything CI runs, in CI's order
 	@echo "verify: ok"
 
 .PHONY: clean

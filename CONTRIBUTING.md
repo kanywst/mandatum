@@ -36,6 +36,9 @@ Run `make verify` before opening a pull request. It is the same set of checks th
 
 - **Tests.** New behaviour needs tests. A bug fix needs a test that fails before the fix. Verification logic needs both positive and negative cases, because a verifier that accepts everything passes every positive test.
 - **Specification first.** A change to the wire format, to verification, or to attenuation must update `docs/spec/` in the same pull request. The specification is normative; the code follows it.
+- **No document that does not exist.** A sentence claiming something is recorded in another file must be about a file that exists, or that file must be listed as Planned in [docs/README.md](docs/README.md). CI checks it, because whoever writes such a sentence intends to write the file and is therefore the last to notice it is missing. It has happened three times here.
+
+  A link is held to the stricter standard: it must resolve, even to a document declared Planned. A reader who clicks it gets a dead end whatever the table says, so an unwritten document may be mentioned in prose and not linked.
 - **No silent fail-open.** Any code path that cannot complete a check must deny. A pull request that introduces a path where a failure results in allowing an action will not be merged, regardless of how unlikely the failure is.
 - **Dependencies.** Adding a dependency requires justification in the pull request. Its license must be on the CNCF allowlist, including transitively; CI enforces this. Prefer the standard library.
 - **Commits.** Conventional-commits style (`feat(verify): ...`, `fix: ...`, `docs: ...`). One logical change per commit; do not mix refactoring with behaviour changes.
