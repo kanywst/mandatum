@@ -16,6 +16,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: i18n-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   translation-drift:
     name: translations track their source

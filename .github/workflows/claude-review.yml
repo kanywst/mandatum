@@ -29,6 +29,7 @@ concurrency:
 
 jobs:
   review:
+    name: review the diff
     # A pull request from a fork gets no secrets, so the job would fail on
     # authentication rather than say anything useful. Drafts are skipped until
     # they are marked ready, which is what the ready_for_review trigger is for.
@@ -45,6 +46,7 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
+      # Posting the summary and the inline findings.
       pull-requests: write
       # The delivery check reads the pull request's conversation comments,
       # which GitHub serves from the issues endpoint.

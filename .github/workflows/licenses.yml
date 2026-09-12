@@ -16,6 +16,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: licenses-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   allowlist:
     name: dependency licenses are on the CNCF allowlist

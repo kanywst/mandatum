@@ -38,7 +38,9 @@ jobs:
     name: codeql
     runs-on: ubuntu-latest
     permissions:
+      # Uploading the CodeQL SARIF to the security tab.
       security-events: write
+      # CodeQL reads workflow runs to attribute findings to a commit.
       actions: read
       contents: read
     steps:
@@ -66,9 +68,12 @@ jobs:
     # a pull request from a fork cannot change it.
     if: github.event_name != 'pull_request'
     permissions:
+      # Uploading the Scorecard SARIF to the security tab.
       security-events: write
+      # Signing the published result so scorecard.dev can attribute it here.
       id-token: write
       contents: read
+      # Scorecard inspects workflow runs to score CI practices.
       actions: read
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

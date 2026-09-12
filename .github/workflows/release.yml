@@ -8,6 +8,12 @@ on:
 permissions:
   contents: read
 
+# Never cancel a release in flight. A half-published tag is worse than a slow
+# one, so this serialises rather than superseding.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   verify:
     name: verify the tag before publishing anything
@@ -48,8 +54,12 @@ jobs:
     needs: verify
     runs-on: ubuntu-latest
     permissions:
+      # Creating the release and uploading its artifacts.
       contents: write
-      id-token: write   # cosign keyless signing via Sigstore
+      # Cosign keyless signing: exchanged for a short-lived Sigstore
+      # certificate, never a long-lived key.
+      id-token: write
+      # Recording build provenance for the source archive.
       attestations: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -98,27 +108,36 @@ jobs:
         with:
           subject-path: 'dist/mandatum-*.tar.gz'
 
+      # `gh release` rather than a third-party action. The release path is
+      # the one place where an extra dependency can substitute artifacts, and
+      # the CLI is already on the runner.
       - name: Publish
-        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
-        with:
-          files: dist/*
-          generate_release_notes: true
-          body: |
-            Verify this release before using it:
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          notes=$(mktemp)
+          cat > "$notes" <<'EOF'
+          Verify this release before using it:
 
-            ```bash
-            cosign verify-blob \
-              --certificate checksums.txt.pem \
-              --signature checksums.txt.sig \
-              --certificate-identity-regexp 'https://github.com/kanywst/mandatum/.github/workflows/release.yml@.*' \
-              --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-              checksums.txt
+          ```bash
+          cosign verify-blob \
+            --certificate checksums.txt.pem \
+            --signature checksums.txt.sig \
+            --certificate-identity-regexp 'https://github.com/kanywst/mandatum/.github/workflows/release.yml@.*' \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            checksums.txt
 
-            sha256sum -c checksums.txt
-            ```
+          sha256sum -c checksums.txt
+          ```
 
-            An SPDX SBOM is attached. Build provenance is attested and can be
-            checked with `gh attestation verify`.
+          An SPDX SBOM is attached. Build provenance is attested and can be
+          checked with `gh attestation verify`.
 
-            See CHANGELOG.md for what changed, including which Delegation
-            Assertion format versions this release accepts and issues.
+          See CHANGELOG.md for what changed, including which Delegation
+          Assertion format versions this release accepts and issues.
+          EOF
+          gh release create "$TAG" \
+            --title "$TAG" \
+            --notes-file "$notes" \
+            dist/*

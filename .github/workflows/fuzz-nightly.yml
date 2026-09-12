@@ -18,6 +18,12 @@ on:
 permissions:
   contents: read
 
+# A campaign still running when the next one is due is superseded rather than
+# run alongside it: two long fuzz jobs on the same code find the same things.
+concurrency:
+  group: fuzz-nightly-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   fuzz:
     name: fuzz ${{ matrix.package }}
