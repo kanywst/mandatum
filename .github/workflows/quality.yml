@@ -108,6 +108,13 @@ jobs:
           fail: true
         continue-on-error: true
 
+      - name: documents do not reference documents that do not exist
+        # A sentence in the present tense about a file nobody has written is
+        # the same defect as a claim the code does not honour, and it has
+        # appeared three times here. The author of such a sentence intends to
+        # write the file, which is why the author never notices.
+        run: ./hack/check-doc-refs.sh
+
       - name: relative links resolve
         # The step above tolerates the internet being unreliable. This one
         # does not tolerate a link into our own tree being wrong, because
