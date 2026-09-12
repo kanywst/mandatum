@@ -30,6 +30,10 @@ jobs:
           - ./pkg/verify
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No job in this repository pushes, so the checkout token has no
+          # reason to outlive the step that used it.
+          persist-credentials: false
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
@@ -37,11 +41,15 @@ jobs:
       - name: Fuzz
         env:
           FUZZTIME: ${{ inputs.fuzztime || '15m' }}
+          # Through the environment rather than interpolated into the script.
+          # These values are ours today, but a workflow that splices
+          # expressions into a shell body is one edit from command injection.
+          PACKAGE: ${{ matrix.package }}
         run: |
           status=0
-          for target in $(go test -list 'Fuzz.*' ${{ matrix.package }} | grep '^Fuzz' || true); do
+          for target in $(go test -list 'Fuzz.*' "$PACKAGE" | grep '^Fuzz' || true); do
             echo "::group::$target"
-            go test -run '^$' -fuzz "^${target}$" -fuzztime="$FUZZTIME" ${{ matrix.package }} || status=1
+            go test -run '^$' -fuzz "^${target}$" -fuzztime="$FUZZTIME" "$PACKAGE" || status=1
             echo "::endgroup::"
           done
           exit $status
