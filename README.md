@@ -6,7 +6,9 @@
 
 **Verifiable delegation for AI agents.** An agent's authority to act becomes a signed chain rooted in a named human — attenuating at every hop, revocable at any link, evaluated across whole action sequences, and recorded in a tamper-evident log.
 
-> **Status: design.** The specification is drafted and open for review. There is no usable implementation yet. See [ROADMAP.md](ROADMAP.md). The specification is the thing to read and argue with: [`docs/spec/delegation-assertion.md`](docs/spec/delegation-assertion.md).
+> **Status: early.** The format, the verifier, the signing layer and the issuer work end to end and are tested against real signatures. Sequence evaluation, the audit log and the AuthZEN binding are not built yet, and nothing here has had a third-party security review. See [ROADMAP.md](ROADMAP.md) and the [threat model](docs/security/threat-model.md) for what that means in practice.
+>
+> The specification is the thing to read and argue with: [`docs/spec/delegation-assertion.md`](docs/spec/delegation-assertion.md).
 
 ---
 
@@ -78,7 +80,18 @@ If something already does those three things, that is worth knowing before more 
 | [CHANGELOG.md](CHANGELOG.md) | What changed, and the known limitations of each release |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | How to get a change merged |
 | [SECURITY.md](SECURITY.md) | Reporting a vulnerability |
+| [Threat model](docs/security/threat-model.md) | What is defended, from whom, what is assumed, and what is not yet covered |
 | [Supply chain](docs/security/supply-chain.md) | How to verify a release, what CI enforces, and the known gaps |
+
+## Trying it
+
+The whole flow — a human sponsors an agent, that agent sub-delegates something narrower, a resource server verifies what arrives, and an attempt to widen is refused — is a runnable example:
+
+```bash
+go test -run Example ./pkg/issue/ -v
+```
+
+The source is [`pkg/issue/example_test.go`](pkg/issue/example_test.go), and it is the shortest honest description of what the library does.
 
 ## Contributing
 
