@@ -17,7 +17,7 @@ The specification references these documents. They are not written yet, and are 
 | Document | Contents | Due |
 | --- | --- | --- |
 | `spec/coaz-mcp-conformance.md` | Conformance against the AuthZEN COAZ-MCP working group draft, and any divergence, stated rather than hidden. | v0.2 |
-| `spec/sequence-store.md` | The interface a sequence-state store must satisfy, and what a store must guarantee for fail-closed behaviour to hold. | v0.3 |
+| `spec/sequence-store.md` | What a replicated sequence store must guarantee for fail-closed behaviour to hold. The interface itself is `sequence.Store`; this is the prose a second implementation would need. | v0.3 |
 | `compliance/eu-ai-act.md` | How the audit trail maps to the high-risk logging and traceability obligations applicable since 2026-08-02. Written by engineers, not lawyers, and says so. | v0.3 |
 | `project/infrastructure.md` | Who currently holds each piece of project infrastructure, per GOVERNANCE.md §5.4. | v0.2 |
 

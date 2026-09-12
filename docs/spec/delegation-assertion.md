@@ -258,7 +258,9 @@ Two properties are required and shape the implementation:
 - **Bounded state.** History cannot grow without limit. Constraints are compiled to a finite automaton over action *tags*, so per-chain state is a fixed-size vector regardless of history length. Constraints that do not compile are rejected at issuance.
 - **Fail-closed on state loss.** If a PEP cannot read the sequence state for a chain that declares `mdt.seq`, it denies. Sequence constraints that silently degrade to per-call checks are worse than no constraints, because operators would believe they are protected.
 
-Sequence state is per chain root and is therefore shared across PEPs. The reference implementation supports a single-process store for development and a replicated store for production; the interface is defined in `docs/spec/sequence-store.md`.
+Sequence state is per chain root and is therefore shared across every enforcement point that honours the same chain. Two PEPs with separate stores give an agent two histories to spend, which defeats the constraint rather than weakening it.
+
+The reference implementation ships a single-process store only. It is correct for one enforcement point and wrong for more than one, and it says so. A replicated store is not written yet; until it is, a multi-PEP deployment does not have sequence constraints, whatever the assertions say. The store interface is small — an atomic read-modify-write per chain root — and is defined by `sequence.Store`.
 
 ### 9.1 What the state is keyed by
 
