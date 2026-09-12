@@ -1,0 +1,44 @@
+# CNCF Allowlist License Policy — approved SPDX identifiers.
+#
+# Source: https://github.com/cncf/foundation/blob/main/policies-guidance/allowed-third-party-license-policy.md
+# Retrieved: 2026-09-12
+#
+# Apache-2.0 needs no review because it is the project's own license. Every
+# other entry here is automatically approved by the CNCF Governing Board only
+# if the component also satisfies the policy's other two conditions:
+#
+#   - it is vendored unmodified in a third-party directory, or fetched at
+#     build time from upstream rather than committed to this repository; AND
+#   - it shows substantial use outside CNCF: part of the language's standard
+#     library, or a GitHub project at least 12 months old with at least
+#     10 stars or 10 forks.
+#
+# CI checks the license identifier only. The other two conditions are a human
+# judgement and must be argued in the pull request that adds the dependency.
+#
+# Anything not on this list requires a CNCF Governing Board exception, which
+# the policy notes is rarely granted. In practice: pick a different dependency.
+#
+# Known traps that are NOT on this list, and that appear transitively in real
+# Go and Rust dependency trees:
+#   Unicode-3.0, CC0-1.0, CDLA-Permissive-2.0, Unlicense, MPL-2.0,
+#   BSD-3-Clause-Clear, and every public-domain dedication.
+
+Apache-2.0
+0BSD
+BSD-2-Clause
+BSD-2-Clause-FreeBSD
+BSD-3-Clause
+MIT
+MIT-0
+ISC
+OpenSSL
+OpenSSL-standalone
+PSF-2.0
+Python-2.0
+Python-2.0.1
+PostgreSQL
+SSLeay-standalone
+UPL-1.0
+X11
+Zlib

@@ -1,0 +1,50 @@
+name: licenses
+
+# CNCF sandbox applications are auto-closed when a transitive dependency
+# carries a license outside the CNCF allowlist. Catching that on the pull
+# request that introduces the dependency costs a dependency swap; catching it
+# at application time costs a rewrite.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Upstream projects relicense. Re-check weekly rather than only on change.
+    - cron: '17 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  allowlist:
+    name: dependency licenses are on the CNCF allowlist
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Install go-licenses
+        run: go install github.com/google/go-licenses@latest
+      - name: Check
+        run: make license-check
+
+  project-license:
+    name: project license is unmodified Apache-2.0
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: LICENSE matches the canonical Apache-2.0 text
+        run: |
+          expected=b40930bbcf80744c86c46a12bc9da056641d722716c378f5659b9e555ef833e1
+          actual=$(sha256sum LICENSE | cut -d' ' -f1)
+          if [ "$actual" != "$expected" ]; then
+            echo "LICENSE has been modified."
+            echo "  expected sha256 $expected"
+            echo "  actual   sha256 $actual"
+            echo
+            echo "The project license must be the unmodified Apache-2.0 text."
+            exit 1
+          fi
+          echo "LICENSE is the canonical Apache-2.0 text."
