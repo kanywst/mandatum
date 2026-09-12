@@ -8,7 +8,7 @@ The binding is a working group draft and will move. Anything here can become wro
 
 ## What is implemented
 
-`authzen.ToolCallRequest` produces the binding's default mapping for `tools/call`:
+`authzen.ToolCallRequest` produces the binding's default mapping for `tools/call`. The authority for what it emits is the test named at the foot of this document, which asserts each field; the table renders that test in prose, and the worked JSON in [the specification](delegation-assertion.md) §8 renders it as an example. If the three ever disagree, the test is right and the other two are stale.
 
 | Binding | Mandatum |
 | --- | --- |
@@ -36,7 +36,7 @@ Arguments and the server identifier go in `resource.properties`, which the bindi
 
 This is an addition, not a divergence. The binding states that `context.agent` names one acting client and never a chain, and that upstream actors are separately addressable — without saying where they go. The prefixed key stays out of the binding's namespace so a future version of the binding cannot collide with it, and so a PDP reading only what the binding defines is unaffected.
 
-Whether the binding should define a place for this is being discussed in [openid/authzen#612](https://github.com/openid/authzen/issues/612). If it does, this object moves and this document records the move.
+Whether the binding should define a place for it is open. The discussion is the `context.agent` trust-semantics thread, [openid/authzen#612](https://github.com/openid/authzen/issues/612) — the same issue is cited elsewhere in this repository for a separate, settled point about RFC 8693 §4.1, so the part that matters here is the resolution that upstream actors are "separately addressable" without saying where. If the binding names a place, this object moves there and this document records the move.
 
 ## Divergences
 
@@ -50,4 +50,4 @@ That is a claim about the default `tools/call` mapping, which is the only part i
 go test -run TestToolCallRequestFollowsTheCoazMapping ./pkg/authzen/ -v
 ```
 
-The test asserts each field above against the binding's default mapping, including the two that are easiest to get backwards: the human in `subject` and the acting agent in `context.agent`.
+This is the authoritative statement of the mapping. It asserts each field above, including the two that are easiest to get backwards: the human in `subject` and the acting agent in `context.agent`. A change to the mapping that does not break this test is a change nobody checked.
