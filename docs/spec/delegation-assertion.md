@@ -274,7 +274,7 @@ A constraint reads "once an action matching `after` has happened, an action matc
 
 ### 9.3 An empty trigger is not permitted
 
-A constraint whose `after` matches everything is refused at issuance and again at evaluation.
+A constraint whose `after` matches everything is refused by structural validation, so it fails at issuance and again at chain verification, and the evaluator refuses it a third time because it must not depend on someone else having checked.
 
 It looks like a way to write "never allow this", and it is not: because a trigger needs something to have happened, an empty one takes effect from the chain's *second* action rather than its first. The gap is silent and the deployment believes it has a prohibition it does not have.
 

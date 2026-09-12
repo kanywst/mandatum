@@ -26,30 +26,48 @@ Model Context Protocol は自身の認可がどこで止まるかを明示して
 
 Mandatum が埋めるのはその隙間です。それ以外はやりません。
 
-## 全体像
+## 動きかた
 
-```text
-  human sponsor  ──── 認証済み、実名、すべての根
-       │
-       ├─ MDA₀   付与: search.query on {public, docs}, 1h, max_depth 3
-       │
-       └─ agent A
-            │
-            ├─ MDA₁   付与: search.query on {public}, 40m, max_depth 2
-            │         ↑ 親より狭い。広げることはできない
-            │
-            └─ agent B
-                 │
-                 └─ MCP tool call ──▶ [ PEP ]
-                                        │  1. 連鎖をオフラインで検証
-                                        │  2. ここまでの並びを確認
-                                        │  3. AuthZEN PDP に問い合わせ
-                                        │  4. 監査ログに追記
-                                        ▼
-                                    allow / deny + 対処可能な理由
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Human as 👤 Alice
+    participant IdP as Identity Provider
+    participant A as 🤖 planner
+    participant B as 🤖 retriever
+    participant PEP as MCP server · PEP
+    participant PDP as AuthZEN PDP
+
+    rect rgba(130,170,255,0.12)
+    Note over Human,A: 委任 · 権限は狭まる一方
+    Human->>IdP: 認証 (パスワード + ハードウェアキー)
+    IdP-->>A: MDA₀ · search.* · 1h · 残り2ホップ
+    A-->>B: MDA₁ · search.query · 40m · 残り1ホップ
+    Note right of B: 広げられない: 試みたリンクは<br/>検証器が拒否する
+    end
+
+    rect rgba(120,220,170,0.12)
+    Note over B,PDP: 強制 · ツールが動く前に、毎回
+    B->>PEP: tools/call search.query + 連鎖 [MDA₀, MDA₁]
+    PEP->>PEP: 連鎖をオフライン検証 (V1〜V9)
+    PEP->>PEP: 連鎖の履歴を確認
+    PEP->>PDP: subject = Alice · agent = retriever
+    PDP-->>PEP: allow
+    PEP-->>B: 結果
+    end
+
+    rect rgba(255,150,150,0.12)
+    Note over B,PEP: 呼び出し単位のチェックには見えない組
+    B->>PEP: tools/call fetch(外部URL)
+    PEP-->>B: 許可
+    B->>PEP: tools/call write(内部レコード)
+    PEP--xB: 拒否 · no-write-after-external-read
+    end
 ```
 
-`MDA₁` を失効させると agent B は即座に権限を失い、B が下位に委任したものもすべて道連れになります。すべての子孫が親をハッシュでコミットしているからです。agent A と兄弟の連鎖には一切影響しません。
+3 が残りすべてを成り立たせている性質です。すべてのリンクが親をハッシュでコミットし、狭める方向にしか動けないので、下りながら権限が増えることはありません。`MDA₁` を失効させると agent B は、自分が下位に委任したものも含めてすべてを失います。agent A と兄弟の連鎖は影響を受けません。
+
+12 が他のどこもやっていないものです。どちらの呼び出しも個別には認可されています。その組が情報漏洩であり、1呼び出しずつ見るチェックには判別できません。
 
 ## これは何ではないか
 
@@ -113,4 +131,4 @@ Issue と Pull Request は日本語で書いても構いません。ただしコ
 
 ---
 
-*translated-from: sha-256:8fa3613fb27566a61a1c8c92bfb51c6b7a359a4bf8f3024a133bc391d43096aa*
+*translated-from: sha-256:d6c5dcf02462372cdc4dd5cbbbccabbe69b5c6970b094a4f4949e0c43eec3be8*

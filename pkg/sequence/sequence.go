@@ -218,11 +218,13 @@ func describe(m mda.ActionMatcher) string {
 
 // Validate reports whether a sequence compiles to a bounded automaton.
 //
-// It is called on every Admit rather than trusted from issuance, because an
-// assertion reaching a verifier may have been issued by something that did
-// not check. Constraints that cannot compile are refused rather than
-// approximated: a constraint evaluated loosely is one an operator believes in
-// and does not have.
+// mda.Claims.Validate performs the same checks during issuance and chain
+// verification. They are repeated here because this is a public entry point
+// and an evaluator must not depend on someone else having validated first:
+// an assertion reaching a verifier may have been issued by something that
+// did not check. Constraints that cannot compile are refused rather than
+// approximated, because a constraint evaluated loosely is one an operator
+// believes in and does not have.
 func Validate(seq *mda.Sequence) error {
 	if seq == nil {
 		return nil
