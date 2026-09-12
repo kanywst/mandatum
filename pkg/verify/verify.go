@@ -20,21 +20,6 @@ import (
 	"github.com/kanywst/mandatum/pkg/mda"
 )
 
-// Assertion is one link as received, together with its parsed claims.
-//
-// Raw is the compact serialization exactly as it arrived. It is kept because
-// the parent commitment is a digest over those bytes; re-serializing the
-// claims could produce a different encoding and break the commitment that
-// makes splicing detectable.
-type Assertion struct {
-	Raw    []byte
-	Claims mda.Claims
-}
-
-// Chain is an ordered delegation chain, from the sponsor's grant at index 0
-// to the acting agent's assertion at the end.
-type Chain []Assertion
-
 // SignatureVerifier checks that raw was signed by the named issuer.
 //
 // Implementations must reject unsigned tokens, the "none" algorithm, and any
@@ -137,7 +122,7 @@ type Result struct {
 // Verify checks a chain against rules V1 through V9 and returns what the
 // chain establishes. A non-nil error means the chain grants nothing; callers
 // must not fall back to partial results.
-func (v *Verifier) Verify(ctx context.Context, chain Chain) (*Result, error) {
+func (v *Verifier) Verify(ctx context.Context, chain mda.Chain) (*Result, error) {
 	if len(chain) == 0 {
 		return nil, ruleErr("V1", -1, "an empty chain establishes nothing")
 	}
@@ -192,7 +177,7 @@ func (v *Verifier) Verify(ctx context.Context, chain Chain) (*Result, error) {
 }
 
 // checkStructure implements V1 (parent commitment) and V2 (custody).
-func (v *Verifier) checkStructure(chain Chain) error {
+func (v *Verifier) checkStructure(chain mda.Chain) error {
 	root := chain[0].Claims.Mandatum
 	if root.Depth != 0 {
 		return ruleErr("V1", 0, fmt.Sprintf("chain starts at depth %d, not 0", root.Depth))
@@ -224,7 +209,7 @@ func (v *Verifier) checkStructure(chain Chain) error {
 }
 
 // checkSignatures implements V3.
-func (v *Verifier) checkSignatures(ctx context.Context, chain Chain) error {
+func (v *Verifier) checkSignatures(ctx context.Context, chain mda.Chain) error {
 	for i, a := range chain {
 		if err := v.sigs.VerifySignature(ctx, a.Claims.Issuer, a.Raw); err != nil {
 			return ruleErr("V3", i, fmt.Sprintf("signature by %q did not verify: %v", a.Claims.Issuer, err))
@@ -234,7 +219,7 @@ func (v *Verifier) checkSignatures(ctx context.Context, chain Chain) error {
 }
 
 // checkTime implements V4.
-func (v *Verifier) checkTime(chain Chain) error {
+func (v *Verifier) checkTime(chain mda.Chain) error {
 	now := v.now()
 	for i, a := range chain {
 		iat := time.Unix(a.Claims.IssuedAt, 0)
@@ -252,7 +237,7 @@ func (v *Verifier) checkTime(chain Chain) error {
 // checkRoot implements V6. The sponsor is duplicated into every link so that
 // a partial chain remains attributable; this is where the duplication is
 // checked to agree, which is what stops it being used to forge attribution.
-func checkRoot(chain Chain) error {
+func checkRoot(chain mda.Chain) error {
 	want := chain[0].Claims.Mandatum.Root
 	for i := 1; i < len(chain); i++ {
 		got := chain[i].Claims.Mandatum.Root
@@ -273,24 +258,24 @@ func checkRoot(chain Chain) error {
 
 // checkDepth implements V7.
 //
-// Given V5 and the structural requirement that max_depth exceed depth, this
-// rule is not independently reachable: a chain that would violate it is
-// rejected earlier for failing one of those. It is kept as defence in depth
-// against a future relaxation of either, and is tested directly rather than
-// left as an untested branch.
-func checkDepth(chain Chain) error {
+// Given V5, which forces max_depth to fall by at least one per hop, and the
+// structural rule that it may not go negative, this is not independently
+// reachable: a chain that would violate it fails V5 first. It is kept as
+// defence in depth against a later relaxation of V5, and tested directly
+// rather than left as an untested branch.
+func checkDepth(chain mda.Chain) error {
 	hops := len(chain) - 1
 	limit := chain[0].Claims.Mandatum.MaxDepth
-	if hops >= limit {
+	if hops > limit {
 		return ruleErr("V7", len(chain)-1, fmt.Sprintf(
-			"chain has %d hops but the sponsor permitted fewer than %d", hops, limit))
+			"chain has %d delegation hops but the sponsor permitted at most %d", hops, limit))
 	}
 	return nil
 }
 
 // checkRevocation implements V8. Revoking any link kills every chain that
 // descends from it, because descendants commit to it by hash.
-func (v *Verifier) checkRevocation(ctx context.Context, chain Chain) error {
+func (v *Verifier) checkRevocation(ctx context.Context, chain mda.Chain) error {
 	for i, a := range chain {
 		revoked, err := v.revoked.IsRevoked(ctx, a.Claims.ID)
 		if err != nil {
@@ -306,7 +291,7 @@ func (v *Verifier) checkRevocation(ctx context.Context, chain Chain) error {
 
 // checkAudience implements V9. Only the leaf is audience-bound: it is the
 // assertion actually being presented to this resource server.
-func (v *Verifier) checkAudience(chain Chain) error {
+func (v *Verifier) checkAudience(chain mda.Chain) error {
 	leaf := len(chain) - 1
 	if got := chain[leaf].Claims.Audience; got != v.audience {
 		return ruleErr("V9", leaf, fmt.Sprintf(
@@ -318,7 +303,7 @@ func (v *Verifier) checkAudience(chain Chain) error {
 // ChainDigest identifies a chain for audit correlation. It commits to every
 // link's serialization in order, so two chains sharing a prefix produce
 // different digests.
-func ChainDigest(chain Chain) string {
+func ChainDigest(chain mda.Chain) string {
 	joined := make([]byte, 0, 64*len(chain))
 	for _, a := range chain {
 		joined = append(joined, mda.Digest(a.Raw)...)

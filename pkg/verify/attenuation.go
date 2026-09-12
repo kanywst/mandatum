@@ -13,31 +13,41 @@ import (
 // that lets a child hold authority its parent did not, which is what makes
 // "the sponsor's grant bounds everything below it" a property rather than a
 // convention.
-func checkAttenuation(chain Chain) error {
+func checkAttenuation(chain mda.Chain) error {
 	for i := 1; i < len(chain); i++ {
-		parent := chain[i-1].Claims
-		child := chain[i].Claims
-
-		if child.ExpiresAt > parent.ExpiresAt {
-			return ruleErr("V5", i, fmt.Sprintf(
-				"outlives its parent (exp %d > %d)", child.ExpiresAt, parent.ExpiresAt))
-		}
-
-		if child.Mandatum.MaxDepth > parent.Mandatum.MaxDepth-1 {
-			return ruleErr("V5", i, fmt.Sprintf(
-				"max_depth %d does not decrease from the parent's %d",
-				child.Mandatum.MaxDepth, parent.Mandatum.MaxDepth))
-		}
-
-		if err := capsEntailed(parent.Mandatum.Capabilities, child.Mandatum.Capabilities); err != nil {
-			return ruleErr("V5", i, err.Error())
-		}
-
-		if err := seqNoWider(parent.Mandatum.Sequence, child.Mandatum.Sequence); err != nil {
+		if err := Attenuates(chain[i-1].Claims, chain[i].Claims); err != nil {
 			return ruleErr("V5", i, err.Error())
 		}
 	}
 	return nil
+}
+
+// Attenuates reports whether child is no wider than parent, implementing the
+// rules in specification section 6 for a single pair of links.
+//
+// It is exported so that an issuer can apply the same check before signing.
+// Two implementations of these rules — one to issue, one to verify — would
+// drift, and the direction they drift in is that the issuer becomes more
+// permissive than the verifier, producing chains that fail at a resource
+// server instead of at the desk of whoever wrote them.
+//
+// A nil return means every rule holds. The error names the rule that failed
+// in terms a delegator can act on.
+func Attenuates(parent, child mda.Claims) error {
+	if child.ExpiresAt > parent.ExpiresAt {
+		return fmt.Errorf("outlives its parent (exp %d > %d)", child.ExpiresAt, parent.ExpiresAt)
+	}
+
+	if child.Mandatum.MaxDepth > parent.Mandatum.MaxDepth-1 {
+		return fmt.Errorf("max_depth %d does not decrease from the parent's %d",
+			child.Mandatum.MaxDepth, parent.Mandatum.MaxDepth)
+	}
+
+	if err := capsEntailed(parent.Mandatum.Capabilities, child.Mandatum.Capabilities); err != nil {
+		return err
+	}
+
+	return seqNoWider(parent.Mandatum.Sequence, child.Mandatum.Sequence)
 }
 
 // capsEntailed reports whether every child capability is covered by some

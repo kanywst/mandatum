@@ -65,8 +65,8 @@ func chainOf(links ...mda.Claims) *builder { return &builder{links: links} }
 // Serialization here stands in for a JOSE compact form; verification treats
 // Raw as opaque bytes, so a stable stand-in is sufficient and keeps these
 // tests independent of a signing implementation.
-func (b *builder) build() Chain {
-	chain := make(Chain, len(b.links))
+func (b *builder) build() mda.Chain {
+	chain := make(mda.Chain, len(b.links))
 	var prevRaw []byte
 	for i, c := range b.links {
 		c.Mandatum.Depth = i
@@ -76,7 +76,7 @@ func (b *builder) build() Chain {
 			c.Mandatum.Parent = mda.Digest(prevRaw)
 		}
 		raw := fmt.Appendf(nil, "link-%d.%s.%s.%s", i, c.Issuer, c.Subject, c.ID)
-		chain[i] = Assertion{Raw: raw, Claims: c}
+		chain[i] = mda.Assertion{Raw: raw, Claims: c}
 		prevRaw = raw
 	}
 	return chain
@@ -115,7 +115,7 @@ func capability(resType, resID, action string) mda.Capability {
 
 // twoHop is the reference chain: sponsor grants to agent A, A sub-delegates a
 // narrower grant to agent B.
-func twoHop() Chain {
+func twoHop() mda.Chain {
 	return chainOf(
 		link(sponsorIss, "agent-a", 3, capability("mcp_tool", "search.*", "invoke")),
 		link("agent-a", "agent-b", 2, capability("mcp_tool", "search.query", "invoke")),
@@ -173,7 +173,7 @@ func TestVerifyAcceptsASingleLink(t *testing.T) {
 func TestVerifyRejects(t *testing.T) {
 	tests := []struct {
 		name     string
-		chain    func() Chain
+		chain    func() mda.Chain
 		sigs     SignatureVerifier
 		rev      RevocationChecker
 		wantRule string
@@ -181,13 +181,13 @@ func TestVerifyRejects(t *testing.T) {
 	}{
 		{
 			name:     "empty chain",
-			chain:    func() Chain { return Chain{} },
+			chain:    func() mda.Chain { return mda.Chain{} },
 			wantRule: "V1",
 			wantText: "establishes nothing",
 		},
 		{
 			name: "assertion with no serialization",
-			chain: func() Chain {
+			chain: func() mda.Chain {
 				c := twoHop()
 				c[1].Raw = nil
 				return c
@@ -197,7 +197,7 @@ func TestVerifyRejects(t *testing.T) {
 		},
 		{
 			name: "spliced link: parent commitment does not match",
-			chain: func() Chain {
+			chain: func() mda.Chain {
 				c := twoHop()
 				c[1].Claims.Mandatum.Parent = mda.Digest([]byte("some other assertion"))
 				return c
@@ -207,7 +207,7 @@ func TestVerifyRejects(t *testing.T) {
 		},
 		{
 			name: "chain does not start at depth 0",
-			chain: func() Chain {
+			chain: func() mda.Chain {
 				c := twoHop()
 				return c[1:]
 			},
@@ -216,7 +216,7 @@ func TestVerifyRejects(t *testing.T) {
 		},
 		{
 			name: "depth skips a step",
-			chain: func() Chain {
+			chain: func() mda.Chain {
 				c := twoHop()
 				// max_depth must leave room for the forged depth, or the
 				// per-assertion structural check rejects it first and this
@@ -230,7 +230,7 @@ func TestVerifyRejects(t *testing.T) {
 		},
 		{
 			name: "custody break: issuer is not the parent's delegatee",
-			chain: func() Chain {
+			chain: func() mda.Chain {
 				c := twoHop()
 				c[1].Claims.Issuer = "agent-z"
 				return c
@@ -247,7 +247,7 @@ func TestVerifyRejects(t *testing.T) {
 		},
 		{
 			name: "expired link",
-			chain: func() Chain {
+			chain: func() mda.Chain {
 				c := twoHop()
 				c[1].Claims.ExpiresAt = testNow.Unix() - 3600
 				return c
@@ -257,7 +257,7 @@ func TestVerifyRejects(t *testing.T) {
 		},
 		{
 			name: "link issued in the future",
-			chain: func() Chain {
+			chain: func() mda.Chain {
 				c := twoHop()
 				c[1].Claims.IssuedAt = testNow.Unix() + 3600
 				return c
@@ -267,7 +267,7 @@ func TestVerifyRejects(t *testing.T) {
 		},
 		{
 			name: "child outlives its parent",
-			chain: func() Chain {
+			chain: func() mda.Chain {
 				c := twoHop()
 				c[1].Claims.ExpiresAt = c[0].Claims.ExpiresAt + 1
 				return c
@@ -277,7 +277,7 @@ func TestVerifyRejects(t *testing.T) {
 		},
 		{
 			name: "child does not decrease max_depth",
-			chain: func() Chain {
+			chain: func() mda.Chain {
 				c := twoHop()
 				c[1].Claims.Mandatum.MaxDepth = c[0].Claims.Mandatum.MaxDepth
 				return c
@@ -287,7 +287,7 @@ func TestVerifyRejects(t *testing.T) {
 		},
 		{
 			name: "child grants a capability the parent lacks",
-			chain: func() Chain {
+			chain: func() mda.Chain {
 				return chainOf(
 					link(sponsorIss, "agent-a", 3, capability("mcp_tool", "search.query", "invoke")),
 					link("agent-a", "agent-b", 2, capability("mcp_tool", "admin.deleteAll", "invoke")),
@@ -298,7 +298,7 @@ func TestVerifyRejects(t *testing.T) {
 		},
 		{
 			name: "child widens a prefix into a broader prefix",
-			chain: func() Chain {
+			chain: func() mda.Chain {
 				return chainOf(
 					link(sponsorIss, "agent-a", 3, capability("mcp_tool", "search.*", "invoke")),
 					link("agent-a", "agent-b", 2, capability("mcp_tool", "*", "invoke")),
@@ -309,7 +309,7 @@ func TestVerifyRejects(t *testing.T) {
 		},
 		{
 			name: "child changes the action",
-			chain: func() Chain {
+			chain: func() mda.Chain {
 				return chainOf(
 					link(sponsorIss, "agent-a", 3, capability("mcp_tool", "search.query", "invoke")),
 					link("agent-a", "agent-b", 2, capability("mcp_tool", "search.query", "administer")),
@@ -320,7 +320,7 @@ func TestVerifyRejects(t *testing.T) {
 		},
 		{
 			name: "attribution stripped: sponsor rewritten mid-chain",
-			chain: func() Chain {
+			chain: func() mda.Chain {
 				c := twoHop()
 				c[1].Claims.Mandatum.Root.Subject = "someone-else"
 				return c
@@ -330,7 +330,7 @@ func TestVerifyRejects(t *testing.T) {
 		},
 		{
 			name: "sponsor authentication time rewritten",
-			chain: func() Chain {
+			chain: func() mda.Chain {
 				c := twoHop()
 				c[1].Claims.Mandatum.Root.AuthenticatedAt = 1
 				return c
@@ -340,7 +340,7 @@ func TestVerifyRejects(t *testing.T) {
 		},
 		{
 			name: "child reuses the parent's depth budget",
-			chain: func() Chain {
+			chain: func() mda.Chain {
 				return chainOf(
 					link(sponsorIss, "agent-a", 3, capability("mcp_tool", "search.query", "invoke")),
 					link("agent-a", "agent-b", 3, capability("mcp_tool", "search.query", "invoke")),
@@ -372,7 +372,7 @@ func TestVerifyRejects(t *testing.T) {
 		},
 		{
 			name: "leaf addressed to another resource server",
-			chain: func() Chain {
+			chain: func() mda.Chain {
 				c := twoHop()
 				c[1].Claims.Audience = "https://other.example.org"
 				return c
@@ -489,9 +489,10 @@ func TestNewRejectsUnusableConfiguration(t *testing.T) {
 // against a future change that relaxes either of those, and tested directly
 // so the redundancy is deliberate rather than an untested branch.
 func TestDepthCapIsEnforcedIndependently(t *testing.T) {
+	// The sponsor permitted no sub-delegation, yet a second link exists.
 	overLong := chainOf(
-		link(sponsorIss, "agent-a", 1, capability("mcp_tool", "search.query", "invoke")),
-		link("agent-a", "agent-b", 1, capability("mcp_tool", "search.query", "invoke")),
+		link(sponsorIss, "agent-a", 0, capability("mcp_tool", "search.query", "invoke")),
+		link("agent-a", "agent-b", 0, capability("mcp_tool", "search.query", "invoke")),
 	).build()
 
 	err := checkDepth(overLong)
@@ -501,7 +502,7 @@ func TestDepthCapIsEnforcedIndependently(t *testing.T) {
 	if got := Rule(err); got != "V7" {
 		t.Errorf("rejected by rule %s, want V7", got)
 	}
-	if !strings.Contains(err.Error(), "the sponsor permitted fewer than") {
+	if !strings.Contains(err.Error(), "the sponsor permitted at most") {
 		t.Errorf("error %q does not explain the limit", err)
 	}
 
