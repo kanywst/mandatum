@@ -96,7 +96,9 @@ jobs:
         #
         # A Sigstore bundle rather than a separate .sig and .pem: cosign v3
         # deprecated those flags and, with the new bundle format, ignores
-        # them - so the previous form produced a green step and no signature.
+        # them. On v0.1.0-rc.1 that surfaced as an outright error, because
+        # --bundle then defaulted to an empty path. Had it not, the step
+        # would have gone green having written no signature.
         run: |
           cosign sign-blob --yes \
             --bundle dist/checksums.txt.bundle \
