@@ -8,8 +8,8 @@ import (
 	"github.com/kanywst/mandatum/pkg/mda"
 )
 
-func str(s string) *string   { return new(s) }
-func num(f float64) *float64 { return new(f) }
+func str(s string) *string   { return &s }
+func num(f float64) *float64 { return &f }
 
 // condCovers decides whether a child restriction is at least as tight as its
 // parent's. It is the finest-grained place where authority can widen, so the

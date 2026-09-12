@@ -18,6 +18,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
 
       - name: actionlint
         # Catches the class of mistake that only shows up when a workflow
@@ -25,7 +28,7 @@ jobs:
         # run block.
         run: |
           go install github.com/rhysd/actionlint/cmd/actionlint@latest
-          actionlint -color
+          "$(go env GOPATH)/bin/actionlint" -color
 
       - name: zizmor
         # Static analysis for workflow security: injectable expressions,

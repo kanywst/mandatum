@@ -29,6 +29,12 @@ The Delegation Assertion format is versioned independently by the `mdt.v` claim,
 
 The relationship between the two is recorded in every release note: which `mdt.v` values a version accepts and which it issues.
 
+## Supported Go versions
+
+The `go` directive in `go.mod` is the minimum, and CI builds against it as well as against the current release. It is deliberately not the newest Go: requiring a toolchain released weeks ago is a barrier for anyone whose build environment moves more slowly than this project does.
+
+Raising the minimum is a MINOR bump before v1.0 and a MAJOR bump after, and needs a reason in the pull request beyond a language feature being convenient.
+
 ## Deprecation
 
 Nothing is removed without a deprecation period.
