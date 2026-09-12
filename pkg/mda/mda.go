@@ -59,7 +59,14 @@ type Mandatum struct {
 	// assertion cannot be spliced onto a chain it was not issued against.
 	Parent string `json:"parent"`
 
-	Depth    int `json:"depth"`
+	// Depth is this link's zero-based position in the chain. It orders the
+	// chain; it does not bound it.
+	Depth int `json:"depth"`
+
+	// MaxDepth is how many further delegations are permitted below this
+	// assertion. Zero means this is the end of the line: the holder may act,
+	// but may not sub-delegate. It falls by at least one at every hop, so the
+	// sponsor's value bounds the whole chain.
 	MaxDepth int `json:"max_depth"`
 
 	// Capabilities is the authority granted. An empty slice is meaningful:
@@ -147,8 +154,27 @@ type ActionMatcher struct {
 	ResourceTags []string `json:"resource.tags,omitempty"`
 }
 
+// Assertion is one link as received, together with its parsed claims.
+//
+// Raw is the compact serialization exactly as it arrived. It is kept because
+// the parent commitment is a digest over those bytes; re-serializing the
+// claims could produce a different encoding and break the commitment that
+// makes splicing detectable.
+type Assertion struct {
+	Raw    []byte
+	Claims Claims
+}
+
+// Chain is an ordered delegation chain, from the sponsor's grant at index 0
+// to the acting agent's assertion at the end.
+type Chain []Assertion
+
 // Digest returns the parent-commitment value for a compact-serialized
-// assertion, in the "sha-256:<hex>" form used by the Parent field.
+// assertion, as "sha-256:" followed by unpadded base64url, the form the
+// Parent field uses. The encoding is specified in §5.1 and is an
+// interoperability contract: verifiers compare these as exact strings, so two
+// implementations that encode the same hash differently reject every chain
+// the other produces.
 //
 // The digest is taken over the compact serialization exactly as received,
 // not over a re-encoding of the parsed claims. Re-encoding would let two
@@ -192,9 +218,9 @@ func (c Claims) Validate() error {
 	if c.Mandatum.Depth > 0 && c.Mandatum.Parent == "" {
 		return fmt.Errorf("mda: depth %d must commit to a parent", c.Mandatum.Depth)
 	}
-	if c.Mandatum.MaxDepth <= c.Mandatum.Depth {
-		return fmt.Errorf("mda: mdt.max_depth %d leaves no room at depth %d",
-			c.Mandatum.MaxDepth, c.Mandatum.Depth)
+	if c.Mandatum.MaxDepth < 0 {
+		return fmt.Errorf("mda: mdt.max_depth %d is negative; use 0 to forbid sub-delegation",
+			c.Mandatum.MaxDepth)
 	}
 	if c.Mandatum.Capabilities == nil {
 		return fmt.Errorf("mda: mdt.cap is required; use an empty array to grant nothing")

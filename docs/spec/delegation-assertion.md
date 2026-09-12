@@ -71,9 +71,9 @@ An MDA is a JWS in compact serialization (RFC 7515) whose payload is a JWT claim
       "amr": ["pwd", "hwk"],
       "auth_time": 1789199400
     },
-    "parent": "sha-256:9f2b...c41a",
+    "parent": "sha-256:UNhY4JhezH9gQYqvDMWrWH9CwlcKiECVqejMrND2VFw",
     "depth": 1,
-    "max_depth": 3,
+    "max_depth": 2,
     "cap": [
       {
         "resource": { "type": "mcp_tool", "id": "search.query" },
@@ -94,7 +94,27 @@ An MDA is a JWS in compact serialization (RFC 7515) whose payload is a JWT claim
 }
 ```
 
-### 5.1 Claim semantics
+### 5.1 Digest encoding
+
+Every digest in this specification is written `sha-256:<value>`, where `<value>` is the base64url encoding of the raw 32-byte SHA-256 output **without padding**, as defined by RFC 7515 §2 (`BASE64URL`). This is the encoding JOSE already uses, so an implementation handling JWS has it available.
+
+Stating this is not pedantry. `mdt.parent` is the commitment that makes chain splicing detectable, and two implementations that encode the same hash differently reject every chain the other produces.
+
+Test vectors, so an implementer can check an encoder against this document rather than against prose:
+
+| Input | Digest |
+| --- | --- |
+| `the empty string` | `sha-256:47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU` |
+| `example` | `sha-256:UNhY4JhezH9gQYqvDMWrWH9CwlcKiECVqejMrND2VFw` |
+| `mandatum` | `sha-256:jUMrViVq7f3wcuQ44n0wJz5BNoNwIcxeu0MS7PGfEZI` |
+
+Every digest appearing in the examples in this document is a real value computed this way, not a placeholder.
+
+A verifier MUST compare digests as exact strings after checking the `sha-256:` prefix. It MUST NOT decode and re-encode before comparing, and MUST NOT accept a different encoding of the same hash: accepting several spellings of one value reintroduces the ambiguity this section exists to remove.
+
+Only `sha-256` is defined. A verifier MUST reject any other prefix rather than attempt it, so that a future algorithm is a deliberate version bump rather than something an old verifier silently tolerates.
+
+### 5.2 Claim semantics
 
 | Claim | Required | Meaning |
 | --- | --- | --- |
@@ -105,12 +125,18 @@ An MDA is a JWS in compact serialization (RFC 7515) whose payload is a JWT claim
 | `mdt.v` | yes | Format version. `1` for this document. |
 | `mdt.root` | yes | The human sponsor. Byte-identical across every link in a chain. |
 | `mdt.parent` | yes | Hash of the parent MDA, or `null` at depth 0. |
-| `mdt.depth` | yes | Zero-based index of this link. |
-| `mdt.max_depth` | yes | Maximum permitted chain length from here down. |
+| `mdt.depth` | yes | Zero-based index of this link. It orders the chain; it does not bound it. |
+| `mdt.max_depth` | yes | How many further delegations are permitted below this assertion. Zero means the holder may act but may not sub-delegate. Falls by at least one per hop, so the sponsor's value bounds the whole chain. Never negative. |
 | `mdt.cap` | yes | Capability set. May be empty, meaning no authority. |
 | `mdt.seq` | no | Sequence-scoped constraints. Absent means no sequence limits. |
 
-### 5.2 Why the sponsor is copied, not referenced
+### 5.3 Why depth and max_depth are separate
+
+`depth` says where a link sits; `max_depth` says how much further delegation may go. Tying the two together — for instance requiring `max_depth` to exceed `depth` — looks tidier and is wrong: combined with the per-hop decrease in §6 it halves the usable budget, because the limit falls as the position rises and they meet in the middle.
+
+Keeping them independent means a sponsor granting `max_depth` of *n* gets exactly *n* sub-delegations, which is what an operator writing that number expects.
+
+### 5.4 Why the sponsor is copied, not referenced
 
 `mdt.root` is duplicated into every link rather than resolved by following the chain. A verifier that receives a partial chain, or that wants to index audit records by sponsor without a full verification pass, can then still attribute the action. The duplication is checked for consistency during verification (rule V6), so it cannot be used to forge attribution.
 
@@ -120,7 +146,7 @@ For every link *i* > 0, all of the following MUST hold. Together these make the 
 
 1. `cap(i)` ⊆ `cap(i-1)` — every capability in the child is entailed by some capability in the parent. Entailment is defined in §6.1.
 2. `exp(i)` ≤ `exp(i-1)`
-3. `max_depth(i)` ≤ `max_depth(i-1) − 1`
+3. `max_depth(i)` ≤ `max_depth(i-1) − 1`, and `max_depth(i)` ≥ 0. Together these make the budget strictly decreasing and finite, which is what bounds chain length.
 4. `depth(i)` = `depth(i-1) + 1`
 5. `seq(i)` is at least as restrictive as `seq(i-1)`: numeric budgets do not increase, and the constraint set is a superset.
 6. `root(i)` is byte-identical to `root(i-1)`.
@@ -133,6 +159,11 @@ Capability `c` is entailed by parent capability `p` when the resource pattern of
 
 This is a deliberate limitation. An undecidable condition language would force verifiers to fail open or fail closed on inputs the issuer believed were valid.
 
+Two edge cases, stated because implementations otherwise guess at them:
+
+- An `in` condition with an empty list matches nothing. It is therefore the narrowest restriction expressible, and any parent condition entails it. Such a capability can never apply, which is useless but not unsafe; rejecting it would mean a delegator could not explicitly grant nothing on a key.
+- A condition with no comparison set, or with more than one, is invalid and MUST be rejected at issuance. A condition with none set would restrict nothing, and one with several would require a combination rule this fragment deliberately does not define.
+
 ## 7. Chain verification
 
 Input: an ordered chain `[MDA₀ … MDAₙ]`, a trust bundle, a revocation oracle, and the current time.
@@ -143,13 +174,13 @@ Input: an ordered chain `[MDA₀ … MDAₙ]`, a trust bundle, a revocation orac
 - **V4 Time.** For every link, `iat` ≤ now < `exp`, with a bounded skew.
 - **V5 Attenuation.** Every rule in §6 holds.
 - **V6 Root consistency.** `mdt.root` is byte-identical across all links.
-- **V7 Depth.** `n` < `MDA₀.mdt.max_depth`.
+- **V7 Depth.** `n` ≤ `MDA₀.mdt.max_depth`, where `n` is the number of delegation hops, one fewer than the number of links.
 - **V8 Revocation.** No `jti` in the chain appears in the revocation set.
 - **V9 Audience.** The leaf's `aud` matches the verifying resource server.
 
 Verification is offline except for V3 key resolution and V8, both of which are cacheable. A verifier MUST NOT accept a chain on partial verification.
 
-V7 is redundant in the current rule set: V5 forces `max_depth` to fall by one per hop, and §5.1 requires `max_depth` to exceed `depth`, so any chain that would violate V7 is already rejected by one of those. It is retained as defence in depth against a later relaxation of either rule. Implementations should test it directly rather than leave it as an unreachable branch.
+V7 is redundant in the current rule set: V5 forces `max_depth` to fall by at least one per hop and §5.2 forbids it going negative, so any chain that would violate V7 is already rejected by V5. It is retained as defence in depth against a later relaxation of V5. Implementations should test it directly rather than leave it as an unreachable branch.
 
 ### 7.1 Revocation semantics
 
@@ -169,9 +200,9 @@ A verified chain becomes the subject context of an OpenID AuthZEN Authorization 
     "properties": {
       "mandatum": {
         "root": { "iss": "https://idp.example.org", "sub": "u-8f31c02e" },
-        "chain": "sha-256:1d7e...90ff",
+        "chain": "sha-256:LPJNul-wow4m6DsqxbninhsWHlwfp0JecwQzYpOLmCQ",
         "depth": 2,
-        "cap_digest": "sha-256:44ab...02c1"
+        "cap_digest": "sha-256:n4bQgYhMfWWaL-qgxVrQFaO_TxsrC4Is0V1sFbDwCgg"
       }
     }
   },
@@ -182,7 +213,7 @@ A verified chain becomes the subject context of an OpenID AuthZEN Authorization 
   },
   "action": { "name": "invoke" },
   "context": {
-    "mandatum_seq": { "invocations": 17, "history_digest": "sha-256:aa1c...", "violated": [] }
+    "mandatum_seq": { "invocations": 17, "history_digest": "sha-256:jUMrViVq7f3wcuQ44n0wJz5BNoNwIcxeu0MS7PGfEZI", "violated": [] }
   }
 }
 ```

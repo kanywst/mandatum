@@ -1,6 +1,8 @@
 package mda
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -65,9 +67,9 @@ func TestValidateRejects(t *testing.T) {
 			"must commit to a parent",
 		},
 		{
-			"max_depth leaves no room",
-			func(c *Claims) { c.Mandatum.MaxDepth = 1 },
-			"leaves no room",
+			"negative max_depth",
+			func(c *Claims) { c.Mandatum.MaxDepth = -1 },
+			"is negative",
 		},
 		{
 			"absent capabilities",
@@ -141,6 +143,45 @@ func TestEmptyCapabilitiesGrantNothingAndAreValid(t *testing.T) {
 	c.Mandatum.Capabilities = []Capability{}
 	if err := c.Validate(); err != nil {
 		t.Fatalf("empty capability list rejected: %v", err)
+	}
+}
+
+// The digest encoding is an interoperability contract, not an implementation
+// detail: two implementations that encode the same hash differently reject
+// every chain the other produces. These vectors are the ones published in
+// docs/spec/delegation-assertion.md §5.1, so the specification and the code
+// cannot drift apart without a test failing.
+func TestDigestMatchesTheSpecificationVectors(t *testing.T) {
+	vectors := map[string]string{
+		"":         "sha-256:47DEQpj8HBSa-_TImW-5JCeuQeRkm5NMpJWZG3hSuFU",
+		"example":  "sha-256:UNhY4JhezH9gQYqvDMWrWH9CwlcKiECVqejMrND2VFw",
+		"mandatum": "sha-256:jUMrViVq7f3wcuQ44n0wJz5BNoNwIcxeu0MS7PGfEZI",
+	}
+	for input, want := range vectors {
+		if got := Digest([]byte(input)); got != want {
+			t.Errorf("Digest(%q) = %q, spec says %q", input, got, want)
+		}
+	}
+}
+
+// Base64url without padding, per RFC 7515. Padding or standard base64 would
+// still decode to the same hash but would not compare equal as a string, and
+// the specification requires exact string comparison.
+func TestDigestUsesUnpaddedBase64URL(t *testing.T) {
+	d := Digest([]byte("mandatum"))
+	value, ok := strings.CutPrefix(d, "sha-256:")
+	if !ok {
+		t.Fatalf("digest %q lacks the sha-256: prefix", d)
+	}
+	if strings.ContainsAny(value, "=+/") {
+		t.Errorf("digest value %q is not unpadded base64url", value)
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(value)
+	if err != nil {
+		t.Fatalf("digest value %q does not decode as unpadded base64url: %v", value, err)
+	}
+	if len(raw) != sha256.Size {
+		t.Errorf("digest decodes to %d bytes, want %d", len(raw), sha256.Size)
 	}
 }
 
