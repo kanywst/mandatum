@@ -1,0 +1,18 @@
+{
+  // Markdown house style for this repo. CI runs markdownlint-cli2 against this
+  // file so contributors and CI agree on what "clean" means.
+  "config": {
+    "default": true,
+    // Prose is hard-wrapped at ~78 columns by convention, but tables and
+    // reference lines legitimately run long. Wrapping is a review comment,
+    // not a build failure.
+    "MD013": false,
+    // Section headings repeat across documents by design (for example
+    // "Maintainers" as both the document title and the active-members table).
+    "MD024": false,
+    "MD033": { "allowed_elements": ["picture", "source", "img"] },
+    "MD036": false,
+    "MD041": false,
+    "MD060": false
+  }
+}

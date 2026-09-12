@@ -1,0 +1,14 @@
+# Build and test artifacts
+/bin/
+coverage.out
+coverage.html
+
+# Go fuzzing corpora are cached per machine; crashers belong in testdata and
+# are committed deliberately, not swept in by a wildcard.
+/pkg/**/testdata/fuzz/*/[0-9a-f]*
+
+# Editor and OS noise
+.DS_Store
+*.swp
+.idea/
+.vscode/
