@@ -6,6 +6,14 @@ Each release also records which Delegation Assertion format versions (`mdt.v`) i
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.1.0-rc.2] - 2026-09-12
+
+A pre-release, on the same terms as rc.1: no compatibility promise, not supported.
+
+Wire format: accepts `mdt.v` 1, issues `mdt.v` 1. Unchanged from rc.1 — this release exists only to fix the signing step, which is why rc.1 never published.
+
 ### Fixed
 
 - The release workflow signed nothing. cosign v3 deprecated `--output-signature` and `--output-certificate` and ignores them when writing the new bundle format, so the step failed outright rather than quietly producing an unsigned release — but only because it also errored on the empty `--bundle` path. Releases now write a Sigstore bundle, and the verification instructions match.
@@ -43,5 +51,6 @@ Wire format: accepts `mdt.v` 1, issues `mdt.v` 1.
 - No audit log.
 - Rule V7 is not reachable through the public API. V5 and the structural `max_depth` invariant reject anything that would violate it first. It is retained as defence in depth and tested directly.
 
-[Unreleased]: https://github.com/kanywst/mandatum/compare/v0.1.0-rc.1...HEAD
+[Unreleased]: https://github.com/kanywst/mandatum/compare/v0.1.0-rc.2...HEAD
+[0.1.0-rc.2]: https://github.com/kanywst/mandatum/releases/tag/v0.1.0-rc.2
 [0.1.0-rc.1]: https://github.com/kanywst/mandatum/releases/tag/v0.1.0-rc.1
