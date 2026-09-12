@@ -205,6 +205,12 @@ and the current time.
 Verification is offline except for V3 key resolution and V8, both of which are
 cacheable. A verifier MUST NOT accept a chain on partial verification.
 
+V7 is redundant in the current rule set: V5 forces `max_depth` to fall by one
+per hop, and §5.1 requires `max_depth` to exceed `depth`, so any chain that
+would violate V7 is already rejected by one of those. It is retained as
+defence in depth against a later relaxation of either rule. Implementations
+should test it directly rather than leave it as an unreachable branch.
+
 ### 7.1 Revocation semantics
 
 Revoking any `jti` invalidates that link **and every chain that descends from
