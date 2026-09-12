@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/kanywst/mandatum/pkg/authzen"
 	"github.com/kanywst/mandatum/pkg/mda"
@@ -265,6 +266,67 @@ func TestNewRejectsUnusableConfiguration(t *testing.T) {
 	}
 	if _, err := authzen.New("http://localhost:9999/access/v1/evaluation"); err != nil {
 		t.Errorf("rejected a loopback endpoint, which development needs: %v", err)
+	}
+}
+
+// A plaintext endpoint is tolerated only for the local machine, and "local"
+// includes the spellings people actually use.
+func TestLoopbackSpellings(t *testing.T) {
+	accepted := []string{
+		"http://localhost:9999/access/v1/evaluation",
+		"http://LocalHost:9999/access/v1/evaluation",
+		"http://127.0.0.1:9999/access/v1/evaluation",
+		"http://[::1]:9999/access/v1/evaluation",
+	}
+	for _, e := range accepted {
+		if _, err := authzen.New(e); err != nil {
+			t.Errorf("rejected loopback endpoint %s: %v", e, err)
+		}
+	}
+	for _, e := range []string{
+		"http://pdp.example.org/access/v1/evaluation",
+		"http://10.0.0.1/access/v1/evaluation",
+		"http://localhost.evil.example/access/v1/evaluation",
+	} {
+		if _, err := authzen.New(e); err == nil {
+			t.Errorf("accepted plaintext non-loopback endpoint %s", e)
+		}
+	}
+}
+
+// A PDP's error message is exactly the sort of text that is not ASCII, and a
+// truncated error should still be printable.
+func TestALongNonASCIIErrorBodyStaysValidUTF8(t *testing.T) {
+	body := strings.Repeat("認可が拒否されました。", 60)
+	c := clientFor(t, func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(body))
+	})
+
+	_, err := c.Evaluate(context.Background(), request())
+	if err == nil {
+		t.Fatal("no error reported")
+	}
+	if !utf8.ValidString(err.Error()) {
+		t.Errorf("the error message is not valid UTF-8: %q", err)
+	}
+}
+
+// An error saying only "404" sends whoever is debugging back to the server
+// logs, so discovery keeps whatever the PDP said.
+func TestDiscoveryFailureCarriesTheBody(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"error":"no such tenant"}`))
+	}))
+	defer srv.Close()
+
+	_, err := authzen.Discover(context.Background(), srv.URL, timed(srv))
+	if err == nil {
+		t.Fatal("accepted a 404")
+	}
+	if !strings.Contains(err.Error(), "no such tenant") {
+		t.Errorf("error %q drops what the PDP said", err)
 	}
 }
 

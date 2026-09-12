@@ -25,13 +25,16 @@ usage() {
   exit 2
 }
 
+# Which checksum tool exists is a property of the machine, not of each file,
+# so it is resolved once.
+if command -v sha256sum >/dev/null 2>&1; then
+  SHA256=(sha256sum)
+else
+  SHA256=(shasum -a 256)
+fi
+
 digest_of() {
-  # Portable across the macOS and Linux checksum tools.
-  if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$1" | cut -d' ' -f1
-  else
-    shasum -a 256 "$1" | cut -d' ' -f1
-  fi
+  "${SHA256[@]}" "$1" | cut -d' ' -f1
 }
 
 # English source for a translation: docs/x.ja.md -> docs/x.md
@@ -51,8 +54,16 @@ recorded_digest() {
     tail -1 | sed -E 's/.*sha-256://' || true
 }
 
+# Language suffixes this project uses. Matching '*.*.md' would catch any
+# two-dot filename — a dated snapshot, say — and report it as a translation
+# with no source. Add a code here when a language is added.
+readonly LANGUAGES=(ja)
+
 translations() {
-  find . -name '*.*.md' -not -path './.git/*' | sort
+  local lang
+  for lang in "${LANGUAGES[@]}"; do
+    find . -name "*.${lang}.md" -not -path './.git/*'
+  done | sort
 }
 
 mode="${1:-}"
@@ -62,6 +73,7 @@ case "$mode" in
 esac
 
 stale=0
+marker_line=""
 checked=0
 
 while IFS= read -r translation; do
@@ -92,9 +104,14 @@ while IFS= read -r translation; do
     # this works wherever the repository does. The substitution is confined
     # to the marker line: a document may quote other digests, and a blanket
     # replace would rewrite those too.
+    # Only the last marker line is rewritten. A document may quote an
+    # example marker in prose — docs/i18n.md documents the format, and a
+    # translation of it would — and a blanket substitution would rewrite the
+    # illustration too.
     tmp="${translation}.tmp"
-    sed -E "/${MARKER_PREFIX}/ s/sha-256:[0-9a-f]{64}/sha-256:${want}/" \
-      "$translation" > "$tmp"
+    marker_line=$(grep -nE "${MARKER_PREFIX}[^\n]*sha-256:[0-9a-f]{64}" "$translation" |
+      tail -1 | cut -d: -f1)
+    sed -E "${marker_line}s/sha-256:[0-9a-f]{64}/sha-256:${want}/" "$translation" > "$tmp"
     mv "$tmp" "$translation"
     echo "updated $translation"
   else

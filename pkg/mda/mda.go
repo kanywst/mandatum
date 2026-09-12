@@ -119,8 +119,17 @@ type ActionPattern struct {
 // is set; a condition with zero or more than one set is invalid and must be
 // rejected at issuance rather than interpreted at verification time.
 type Condition struct {
-	Equals *string  `json:"eq,omitempty"`
-	In     []string `json:"in,omitempty"`
+	Equals *string `json:"eq,omitempty"`
+
+	// In carries no omitempty, deliberately. An empty set is meaningful —
+	// it matches nothing, and is how a delegator grants nothing on a key —
+	// but encoding/json treats a zero-length slice as empty regardless of
+	// nil-ness, so omitempty would drop it. The distinction would then
+	// survive in memory and vanish on the wire, which is the worst place
+	// for a semantic difference to disappear. Absent encodes as null and
+	// decodes back to nil; `[]` decodes to an empty non-nil slice.
+	In []string `json:"in"`
+
 	Prefix *string  `json:"prefix,omitempty"`
 	Min    *float64 `json:"min,omitempty"`
 	Max    *float64 `json:"max,omitempty"`

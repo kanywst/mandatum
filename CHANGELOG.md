@@ -13,6 +13,7 @@ Each release also records which Delegation Assertion format versions (`mdt.v`) i
 
 ### Fixed
 
+- An explicitly empty `in` condition did not survive serialization. `encoding/json` drops a zero-length slice under `omitempty` regardless of nil-ness, so "restricts everything" became "no comparison set" — an invalid condition — somewhere between the issuer and the verifier. The §6.1 guarantee that a delegator can always grant nothing on a key was true in memory and false on the wire. `in` no longer carries `omitempty`.
 - `condCovers` refused an empty `in` condition under an `eq` or range parent, contradicting the specification's own §6.1 boundary case, which says a delegator can always grant nothing on a key. An empty set matches nothing and is the narrowest restriction expressible, so every parent in the decidable fragment now entails it. The old behaviour failed safe — over-restrictive, never widening — but the specification said otherwise.
 
 ### Changed

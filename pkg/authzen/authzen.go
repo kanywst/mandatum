@@ -24,10 +24,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // Subject is the principal on whose behalf access is requested.
@@ -125,7 +127,7 @@ func New(endpoint string, opts ...Option) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("authzen: parsing endpoint: %w", err)
 	}
-	if u.Scheme != "https" && u.Hostname() != "localhost" && u.Hostname() != "127.0.0.1" {
+	if u.Scheme != "https" && !isLoopback(u.Hostname()) {
 		return nil, fmt.Errorf(
 			"authzen: endpoint %q is not https; an evaluation carries the subject's identity", endpoint)
 	}
@@ -139,12 +141,8 @@ func New(endpoint string, opts ...Option) (*Client, error) {
 	for _, o := range opts {
 		o(c)
 	}
-	// net/http applies a deadline only when Timeout is positive, so a
-	// negative value is "no timeout" just as zero is.
-	if c.http.Timeout <= 0 {
-		return nil, fmt.Errorf(
-			"authzen: the HTTP client's timeout is %s; an evaluation that never returns is an enforcement point that never answers",
-			c.http.Timeout)
+	if err := requireTimeout(c.http); err != nil {
+		return nil, err
 	}
 	return c, nil
 }
@@ -250,11 +248,18 @@ func (e *StatusError) Error() string {
 	return msg
 }
 
+// truncate cuts on a rune boundary. Slicing by byte index can split a
+// multi-byte character, and a PDP's error message is exactly the sort of text
+// that is not ASCII.
 func truncate(s string, n int) string {
 	if len(s) <= n {
 		return s
 	}
-	return s[:n] + "…"
+	cut := n
+	for cut > 0 && !utf8.RuneStart(s[cut]) {
+		cut--
+	}
+	return s[:cut] + "…"
 }
 
 func (r Request) validate() error {
@@ -265,6 +270,31 @@ func (r Request) validate() error {
 		return errors.New("authzen: resource requires both type and id")
 	case r.Action.Name == "":
 		return errors.New("authzen: action requires a name")
+	}
+	return nil
+}
+
+// isLoopback reports whether host names the local machine, so that a
+// plaintext endpoint is tolerated in development without tolerating one
+// anywhere else. Case-insensitive, and IPv6 counts.
+func isLoopback(host string) bool {
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	return net.ParseIP(host).IsLoopback()
+}
+
+// requireTimeout enforces the invariant every outbound call here shares.
+//
+// net/http applies a deadline only when Timeout is positive, so a negative
+// value means "no timeout" exactly as zero does. Both are refused: a request
+// that never returns is an enforcement point that never answers, and this
+// package's fail-closed promise rests on every request having an end.
+func requireTimeout(c *http.Client) error {
+	if c.Timeout <= 0 {
+		return fmt.Errorf(
+			"authzen: the HTTP client's timeout is %s; a request that never returns is an enforcement point that never answers",
+			c.Timeout)
 	}
 	return nil
 }

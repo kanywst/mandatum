@@ -2,7 +2,7 @@
 
 **English** | [日本語](delegation-assertion.ja.md)
 
-Status: **Draft 0.1** — design document, not yet implemented. Last updated: 2026-09-12
+Status: **Draft 0.1**. Implemented, and not yet reviewed by anyone outside the project. Last updated: 2026-09-12
 
 ## 1. Problem
 

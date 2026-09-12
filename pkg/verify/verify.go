@@ -106,12 +106,11 @@ type Result struct {
 	Sponsor mda.Sponsor
 	// Agent is the acting principal: the leaf's subject.
 	Agent string
-	// Actors lists every principal the authority passed through, from the
-	// agent the sponsor granted to, down to Agent. It answers "who was
-	// upstream" — the question a flat list of prior actors also answers.
-	// ChainDigest is what makes it more than a list: it commits to the exact
-	// links, so the sequence cannot be reassembled from pieces of other
-	// chains.
+	// Actors lists every principal the authority passed through, in order,
+	// from the agent the sponsor granted to, down to Agent. It answers "who
+	// was upstream". On its own it is a list; paired with ChainDigest, which
+	// commits to the exact links, it is a list that cannot have been
+	// assembled from pieces of other chains.
 	Actors []string
 	// Capabilities is the leaf's capability set, already known to be within
 	// everything above it.

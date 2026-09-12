@@ -44,7 +44,7 @@ func Discover(ctx context.Context, pdp string, httpClient *http.Client) (Metadat
 	if err != nil {
 		return m, fmt.Errorf("authzen: parsing the PDP identifier: %w", err)
 	}
-	if u.Scheme != "https" && u.Hostname() != "localhost" && u.Hostname() != "127.0.0.1" {
+	if u.Scheme != "https" && !isLoopback(u.Hostname()) {
 		return m, fmt.Errorf("authzen: the PDP identifier %q must use https", pdp)
 	}
 	if u.RawQuery != "" || u.Fragment != "" {
@@ -58,12 +58,10 @@ func Discover(ctx context.Context, pdp string, httpClient *http.Client) (Metadat
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: DefaultTimeout}
 	}
-	// The same standard New holds a client to. A caller who reuses one
-	// client for both would otherwise get a guarded evaluation and an
-	// unguarded metadata fetch that can hang indefinitely.
-	if httpClient.Timeout <= 0 {
-		return m, fmt.Errorf(
-			"authzen: the HTTP client's timeout is %s; discovery must not hang", httpClient.Timeout)
+	// The same guard New applies. A caller reusing one client for both would
+	// otherwise get a checked evaluation and an unchecked metadata fetch.
+	if err := requireTimeout(httpClient); err != nil {
+		return m, err
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, wellKnown.String(), nil)
 	if err != nil {
@@ -77,13 +75,15 @@ func Discover(ctx context.Context, pdp string, httpClient *http.Client) (Metadat
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	if resp.StatusCode != http.StatusOK {
-		return m, &StatusError{Status: resp.StatusCode}
-	}
-
 	raw, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
 		return m, fmt.Errorf("authzen: reading PDP metadata: %w", err)
+	}
+	// Read before checking the status, so a failure carries whatever the PDP
+	// sent to explain itself. Evaluate does the same: an error saying only
+	// "404" sends whoever is debugging back to the server logs.
+	if resp.StatusCode != http.StatusOK {
+		return m, &StatusError{Status: resp.StatusCode, Body: strings.TrimSpace(string(raw))}
 	}
 	if err := json.Unmarshal(raw, &m); err != nil {
 		return m, fmt.Errorf("authzen: decoding PDP metadata: %w", err)
