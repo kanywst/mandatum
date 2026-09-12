@@ -8,14 +8,14 @@
 header:
   schema-version: 1.0.0
   expiration-date: '2027-09-12T00:00:00.000Z'
-  last-updated: '2026-09-12'
-  last-reviewed: '2026-09-12'
+  last-updated: '2026-09-13'
+  last-reviewed: '2026-09-13'
   project-url: https://github.com/kanywst/mandatum
   license: https://github.com/kanywst/mandatum/blob/main/LICENSE
   changelog: https://github.com/kanywst/mandatum/blob/main/CHANGELOG.md
 
 project-lifecycle:
-  status: concept
+  status: wip
   roadmap: https://github.com/kanywst/mandatum/blob/main/ROADMAP.md
   bug-fixes-only: false
   core-maintainers:
@@ -43,10 +43,13 @@ distribution-points:
 
 security-artifacts:
   threat-model:
-    threat-model-created: false
+    threat-model-created: true
+    evidence-url:
+      - https://github.com/kanywst/mandatum/blob/main/docs/security/threat-model.md
     comment: |
-      The specification carries a summary threat model in section 11. The full
-      model is scheduled for v0.1; see docs/README.md.
+      Names the actor the format is for, states the assumptions rather than
+      leaving them implicit, and lists what is not covered. Written by the
+      project about its own design; no third party has reviewed it.
   self-assessment:
     self-assessment-created: false
     comment: |

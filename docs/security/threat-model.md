@@ -1,6 +1,6 @@
 # Threat model
 
-Last updated: 2026-09-12. Covers the Delegation Assertion format and the verifier, at the state described in [CHANGELOG.md](../../CHANGELOG.md).
+Last updated: 2026-09-13. Covers the Delegation Assertion format, the verifier, the signing layer, the AuthZEN binding and sequence evaluation, at the state described in [CHANGELOG.md](../../CHANGELOG.md).
 
 The specification carries a summary table in section 11. This is the full version: what is being defended, from whom, what is assumed rather than enforced, and what is knowingly not covered.
 
@@ -75,7 +75,13 @@ A chain issued for one resource server is presented to another, or an agent's br
 
 ### Sequence evasion
 
-An agent reads untrusted content and then mutates, which per-call authorization cannot see. Answered by sequence constraints — **and this is the part not yet implemented**. See "Not yet covered".
+An agent reads untrusted content and then mutates, which per-call authorization cannot see. Answered by sequence constraints, evaluated per chain root so that delegating to a fresh sub-agent lands in the same history. An unreadable history denies.
+
+Three residual weaknesses, each of which makes the constraint weaker than it looks:
+
+- **A constraint is only as good as the tags.** The rules match on resource tags, so a mutating tool nobody tagged `mutating` is unconstrained. Nothing here can verify that a deployment tagged its tools honestly, and a missing tag fails open in the sense that matters: the action is admitted.
+- **One store, one enforcement point.** The shipped store is in-process. Two PEPs with separate stores give an agent two histories to spend, which defeats a constraint rather than weakening it. A deployment with more than one enforcement point does not have sequence constraints today.
+- **`Forget` resets.** Discarding a chain's history clears the triggers it is under. It exists for chains that have expired, and calling it on a live one is a way past a constraint. The store refuses to grow past a cap rather than evicting, for exactly this reason, but the explicit call is still there for a caller to misuse.
 
 ### Log tampering
 
@@ -93,10 +99,11 @@ Listed because a threat model that only describes finished work is a marketing d
 
 | Gap | Consequence |
 | --- | --- |
-| Sequence evaluation is not implemented | The read-then-mutate pattern is expressible and attenuated, but nothing enforces it. Do not rely on `mdt.seq` today. |
-| No audit log | There is no tamper-evident record. The attribution the format establishes is not yet written anywhere durable. |
+| No replicated sequence store | The shipped store is in-process. A deployment with more than one enforcement point has no sequence constraints, whatever its assertions declare. |
+| Sequence rules depend on resource tags nothing verifies | An untagged mutating tool is unconstrained. The trust boundary here is whoever tags the tools. |
+| No audit log | There is no tamper-evident record. The attribution the format establishes is not yet written anywhere durable, and §10 of the specification describes something that does not exist. |
 | No revocation distribution | `RevocationChecker` is an interface with no production implementation. |
-| No AuthZEN binding | Nothing turns a verified chain into an evaluation request yet. |
+| Untested against a real PDP | The AuthZEN client is exercised against test servers covering each failure mode, not against any implementation somebody else wrote. |
 | No third-party review | Everything here is the authors' own analysis of their own design. Treat it accordingly. |
 | Key compromise is undetectable | No monitoring, no transparency log for issued assertions. |
 | Cross-trust-domain chains are unspecified | SPIFFE federation answers key resolution; who may sponsor across a domain boundary is open. See specification section 12. |
