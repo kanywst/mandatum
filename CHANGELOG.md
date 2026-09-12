@@ -6,6 +6,14 @@ Each release also records which Delegation Assertion format versions (`mdt.v`) i
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.1.0-rc.1] - 2026-09-12
+
+A pre-release. Per [VERSIONING.md](VERSIONING.md) it carries no compatibility promise and is not supported.
+
+It exists to exercise the release path — signing, SBOM, provenance, the changelog gate — before a release where getting that wrong would matter. It is not v0.1.0: that version's gates in [ROADMAP.md](ROADMAP.md) require fuzzing to run clean for 24 hours, and the nightly campaign has not done that yet. Gates are commitments, so the version number waits for them.
+
 Wire format: accepts `mdt.v` 1, issues `mdt.v` 1.
 
 ### Added
@@ -33,4 +41,5 @@ Wire format: accepts `mdt.v` 1, issues `mdt.v` 1.
 - No audit log.
 - Rule V7 is not reachable through the public API. V5 and the structural `max_depth` invariant reject anything that would violate it first. It is retained as defence in depth and tested directly.
 
-[Unreleased]: https://github.com/kanywst/mandatum/commits/main
+[Unreleased]: https://github.com/kanywst/mandatum/compare/v0.1.0-rc.1...HEAD
+[0.1.0-rc.1]: https://github.com/kanywst/mandatum/releases/tag/v0.1.0-rc.1
