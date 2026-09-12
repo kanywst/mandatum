@@ -21,14 +21,14 @@ Mandatum addresses exactly that gap and nothing else.
 Stating these first, because the failure mode for a project in this space is scope creep into territory that is already occupied.
 
 - **Not a new authorization engine.** Mandatum never decides. It carries the facts a decision needs and calls a Policy Decision Point that already exists (OPA, Cedar, OpenFGA, SpiceDB, Cerbos, or any AuthZEN-conformant PDP).
-- **Not a new wire protocol.** Delegation is expressed with JOSE, issued with RFC 8693 token exchange, and evaluated with the OpenID AuthZEN Authorization API 1.0. Where an existing standard fits, Mandatum uses it unchanged.
+- **Not a new wire protocol.** Delegation is expressed with JOSE, issued with RFC 8693 token exchange, and evaluated with the OpenID AuthZEN Authorization API 1.0. Where an existing standard fits, Mandatum uses it unchanged. The one place it deliberately goes beyond a standard is §3.1.
 - **Not a gateway.** Mandatum ships as a library and as middleware. It is meant to run *inside* agentgateway, ToolHive, an MCP server, or an agent runtime — not to replace any of them.
 - **Not a registry, sandbox, or agent runtime.** Those categories are occupied.
 - **Not a blockchain.** The audit log is an RFC 6962-style Merkle tree. There is no consensus protocol, no network, and no token.
 
 ## 3. Prior art
 
-Mandatum's attenuation model is not novel and does not claim to be. Capability attenuation with offline verification is the contribution of macaroons (Birgisson et al., 2014) and, in a modern form, Biscuit. SPIFFE established cryptographic workload identity. RFC 8693 established token exchange with delegation semantics (`actor_token`, the `act` claim). RFC 6962 established tamper-evident logging.
+Mandatum's attenuation model is not novel and does not claim to be. Capability attenuation with offline verification is the contribution of macaroons (Birgisson et al., 2014) and, in a modern form, Biscuit. SPIFFE established cryptographic workload identity. RFC 8693 established token exchange with delegation semantics (`actor_token`, the `act` claim), and drew a line Mandatum sits outside of: §4.1 requires a consumer to consider only the current actor, and treats prior actors in nested `act` claims as informational. RFC 6962 established tamper-evident logging.
 
 What Mandatum adds to that body of work is narrow and specific:
 
@@ -37,6 +37,14 @@ What Mandatum adds to that body of work is narrow and specific:
 - a **binding to the AuthZEN Authorization API**, so the chain becomes input to any conformant PDP rather than to one vendor's engine.
 
 If a reviewer concludes that an existing project already does these three things, that is a reason to contribute there instead. See `docs/alternatives.md`.
+
+### 3.1 Relationship to RFC 8693 §4.1
+
+Mandatum authorizes on a delegation history at the resource server. RFC 8693 §4.1 says not to do that with nested `act` claims: a consumer "MUST only consider the token's top-level claims and the party identified as the current actor", and prior actors are "informational only and are not to be considered in access control decisions".
+
+There is no conflict, because Mandatum does not use `act` for this. A chain is a separate credential whose links are independently signed, commit to their parents by hash, and are checked to have narrowed at every hop. RFC 8693 asks a resource server to trust the authorization server's judgement, recorded once at issuance and gated by `may_act`; a Mandatum chain carries evidence the resource server checks for itself.
+
+An implementation using both should be clear about which is doing what: RFC 8693 for obtaining a token, Mandatum for the delegation history any policy decision rests on. Presenting chain-based authorization as RFC 8693 conformance would be wrong, and this specification does not.
 
 ## 4. Terminology
 
