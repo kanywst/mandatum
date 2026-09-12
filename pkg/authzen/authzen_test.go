@@ -195,7 +195,7 @@ func TestNewRejectsUnusableConfiguration(t *testing.T) {
 		t.Error("accepted a plaintext endpoint; an evaluation carries the subject's identity")
 	}
 	if _, err := authzen.New("://nonsense"); err == nil {
-		t.Error("accepted an unparseable endpoint")
+		t.Error("accepted an unparsable endpoint")
 	}
 	if _, err := authzen.New("https://pdp.example.org/access/v1/evaluation",
 		authzen.WithHTTPClient(&http.Client{})); err == nil {
