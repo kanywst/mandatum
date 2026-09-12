@@ -16,7 +16,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
-          go-version-file: go.mod
+          # Current Go: go-licenses needs a newer toolchain than the library
+          # declares as its minimum. The oldstable job in ci.yml is what keeps
+          # that minimum honest.
+          go-version: stable
       - run: make build
       - run: make test
       - name: Dependency licenses
