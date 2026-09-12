@@ -69,6 +69,22 @@ Step 3 is the property that makes the rest work: every link commits to its paren
 
 Step 12 is the one nothing else does. Both calls are individually authorized. The pair is the exfiltration, and a check that sees one call at a time cannot tell.
 
+## Three places this fits
+
+**A coding agent that can open pull requests.** It reads a dependency's README, an issue comment, a diff from a fork: all attacker-writable. Then it pushes. Tag the reads `external-content` and the push `mutating`, and the second one stops after the first.
+
+```json
+{ "id": "no-push-after-third-party-read",
+  "forbid": { "resource.tags": ["mutating"] },
+  "after":  { "resource.tags": ["external-content"] } }
+```
+
+**A support agent that can issue credits.** The customer's message is attacker-controlled text and the refund tool moves money. Same shape, and the sponsor is the engineer who approved the session, so the audit record names a person rather than `svc-support-bot`.
+
+**A research agent someone left running.** `max_invocations` on the sponsor's grant caps the whole chain. Because state is keyed by the chain root, spawning ten sub-agents spends the same budget rather than ten of them.
+
+None of these need a new policy engine. They need the tool call to know what happened earlier under the same authority.
+
 ## What this is not
 
 The failure mode for a project in this space is drifting into categories that are already occupied. Mandatum stays out of them by design:
