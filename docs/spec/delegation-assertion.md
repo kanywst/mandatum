@@ -243,7 +243,16 @@ The shape of `subject`, `action`, `resource` and `context.agent` is the COAZ-MCP
 
 `actors` answers "who was upstream". `chain` is what makes it more than a list — it commits to the exact links, so a sequence of actors cannot be reassembled from pieces of other chains. Whether the commitment is necessary, or a verified list is enough, is genuinely open; see §12.
 
-The chain is verified **before** the PDP is called. The PDP receives a statement of fact ("this agent holds a valid chain rooted in this human") and applies organizational policy on top. Separating the two means an operator can change policy without changing credential handling, and a compromised PDP cannot manufacture authority that no sponsor granted.
+The chain is verified **before** the PDP is called. The PDP receives a statement of fact ("this agent holds a valid chain rooted in this human") and applies organizational policy on top. Separating the two means an operator can change policy without changing credential handling.
+
+Verification alone does not stop a PDP granting more than the sponsor did. Nothing in an evaluation response is bounded by the chain, so a PEP that asks the PDP and enforces the answer has handed the PDP the sponsor's authority. The bound comes from a third step, and only if the PEP takes it:
+
+1. verify the chain;
+2. check the chain's capability set covers the request;
+3. ask the PDP;
+4. allow only if all three agree.
+
+A PEP MUST perform step 2 and MUST refuse on its failure whatever the PDP said. This is what "a compromised PDP cannot manufacture authority that no sponsor granted" means, and it is a property of the enforcement point's ordering rather than of the format. An implementation that skips it has the confused deputy this specification exists to prevent, wearing a valid chain.
 
 Where the OIDF COAZ-MCP binding (WG draft, June 2026) specifies a mapping from MCP tool calls to AuthZEN requests, Mandatum follows it rather than defining a parallel one. What is implemented, what is not, and the one place the output goes beyond the binding are set out in [coaz-mcp-conformance.md](coaz-mcp-conformance.md).
 
@@ -326,7 +335,7 @@ Summarized here; the full model is in `docs/security/threat-model.md`.
 | Attribution stripping | V6 root consistency; `root` cannot be dropped or rewritten. |
 | Log tampering | Merkle inclusion and consistency proofs. |
 | Sequence-state evasion | Fail-closed on state loss; state keyed by chain root, not by PEP. |
-| PDP compromise | A PDP can deny, and can allow only within the chain's capability set. It cannot widen authority. |
+| PDP compromise | A PDP may deny anything. It can widen nothing, provided the enforcement point checks the request against the chain's capability set as well as asking the PDP; see §8. Skipping that check gives the PDP the sponsor's authority. |
 
 The last row is a deliberate design property: verification precedes and constrains the policy decision, so the PDP is not fully trusted.
 
