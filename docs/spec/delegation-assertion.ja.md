@@ -9,13 +9,13 @@
 
 ## 1. 問題
 
-人間の代わりに行為する AI エージェントは、今日ほぼ例外なく**クレデンシャルを継承する**ことでそれを行っています。サービスアカウント、API キー、共有 OAuth トークン、あるいは人間自身のセッション。ここから3つの失敗が直接導かれ、そのいずれも仮定ではなく実測されたものです。
+人間の代わりに行為する AI エージェントは、今日ほぼ例外なく**クレデンシャルを継承する**ことでそれを行っています。サービスアカウント、API キー、共有 OAuth トークン、あるいは人間自身のセッション。ここから3つの失敗が直接導かれます。1つ目は実測されたものです。2つ目と3つ目は、クレデンシャルが共有される仕方と認可が評価される仕方からの帰結であり、調査ではなく論証によるものです。
 
-1. **帰属がない。** エージェントの行動を全環境で人間のスポンサーまで追跡できる組織は 28% に過ぎず、68% はエージェントの活動と人間の活動を確実に区別できません（Cloud Security Alliance, *State of NHI and AI Security*, 2026年1月）。
+1. **帰属がない。** エージェントの行動を全環境で人間またはシステムまで確実に追跡できる組織は 28% です（Cloud Security Alliance and Strata Identity, *Securing Autonomous AI Agents*, 2026年2月, n=285）。また 68% は AI エージェントの活動と人間の活動を明確に区別できません（Cloud Security Alliance and Aembit, *Identity and Access Gaps in the Age of Autonomous AI*, 2026年3月, n=228）。いずれもベンダー委託の自己申告調査であり、どちらも「人間のスポンサー」とは言っていません。前者が言うのは「人間またはシステム」です。
 2. **選択的な失効ができない。** エージェントは継承したクレデンシャルを共有しているため、1つのエージェントを失効させると、そのクレデンシャルを使うすべてのプリンシパルが巻き添えになります。これが *credential piggybacking* と呼ばれる失敗モードです。
 3. **並びに対する制御がない。** 認可は呼び出しごとに評価されます。エージェントは一連のリクエストの各々について個別に認可されていながら、その*一連*が誰も認可していない結果を生むことがあります。現行のプロトコルは行動の並びに対する制約を表現できず、単一の行動に対する制約しか表現できません。
 
-Model Context Protocol の認可層は、自らのスコープの限界を明示しています。認可はトランスポート層で定義されるものであり、ツール単位の認可、エージェント識別、委任、同意はスコープ外である、と。Enterprise-Managed Authorization 拡張（stable, 2026-06-18）も自身の言葉で同じことを述べています。それが統べるのは接続であって、個々のツール呼び出しではありません。
+MCP 自身の認可仕様が扱うのはトランスポートです。クライアントがサーバ向けのトークンをどう取得するかを定義し、そのトークンがどのツールを呼べるか、誰がそれを保持しているか、誰が誰に委任したかについては何も定義しません。これらを「スコープ外」と宣言しているわけではありません — 言及していないのです。そして MCP の認可 interest group には、ツール単位のスコープと、エージェントの連鎖をまたぐ同意についての活動中の作業があります。Enterprise-Managed Authorization 拡張（stable, 2026-06-18）はエンタープライズの identity assertion からアクセストークンを得るためのものであり、その産物は呼び出しではなくサーバ単位です。どちらの文書も限界を主張してはいません。限界とは、それらが定義している範囲のことです。
 
 Mandatum はまさにこの隙間だけを扱います。
 
@@ -324,7 +324,7 @@ OIDF の COAZ-MCP バインディング（WG Draft, 2026年6月）が MCP ツー
 
 ログは RFC 6962 形式の Merkle ツリーです。包含証明と一貫性証明により、監査者はレコードが改変も削除もされていないことを検証できます。
 
-EU AI Act の high-risk 義務は 2026-08-02 から適用されており、不変のログと追跡可能な委任チェーンを要求します。本節はその義務に形を与えられていますが、それを満たしてはいません。ここに書かれたものはまだ何も実装されていないからです。これらの義務と実装の対応表は、対応させる実装ができてから書く価値があるものであり、それより前ではありません。
+本節は EU AI Act に形を与えられていますが、その日付も要求内容も間違えやすいものです。Digital Omnibus（Regulation (EU) 2026/1744、2026-07-27 発効）により、Annex III の high-risk 義務は 2027-12-02 に、Annex I のものは 2028-08-02 に移りました。当初の 2026-08-02 を保ったのは Article 50 の透明性義務だけです。Article 12 が high-risk システムに要求するのは、そのライフタイムにわたるイベントの自動記録であり、意図された目的に照らして適切な水準の追跡可能性です。「不変（immutable）」とは書かれておらず、委任にも言及していません。誰が何を委任したかの改竄検知可能なログは記録保持義務を満たす一つの合理的な方法ですが、それが義務そのものではありません。本節の内容はまだ何も実装されておらず、Act の各条項と実装の対応表は、対応させる実装ができてから書く価値があるものです。
 
 ## 11. 脅威モデル
 
@@ -370,9 +370,10 @@ EU AI Act の high-risk 義務は 2026-08-02 から適用されており、不�
 - draft-ietf-wimse-arch, draft-ietf-wimse-s2s-protocol
 - draft-klrc-aiagent-auth-03 — AI Agent Authentication and Authorization
 - Birgisson et al., *Macaroons: Cookies with Contextual Caveats* (2014)
-- Cloud Security Alliance, *State of NHI and AI Security* (2026-01)
-- Regulation (EU) 2024/1689 (AI Act), high-risk obligations applicable 2026-08-02
+- Cloud Security Alliance and Strata Identity, *Securing Autonomous AI Agents* (2026-02)
+- Cloud Security Alliance and Aembit, *Identity and Access Gaps in the Age of Autonomous AI* (2026-03)
+- Regulation (EU) 2024/1689 (AI Act) Article 12, as amended by Regulation (EU) 2026/1744; Annex III high-risk obligations apply from 2027-12-02
 
 ---
 
-*translated-from: sha-256:70f4c55a314196bbf9bcb205096f9615a922d8912a25d3569deb2fad257aa6d9*
+*translated-from: sha-256:32c2b19438fff7a76776a260814fd3c92a06eb7cc64bd6d3e1b0d5abb6b4d8c7*

@@ -14,15 +14,15 @@
 
 ## The problem
 
-An AI agent acting for a person almost always does so by inheriting a credential — a service account, an API key, a shared token, the human's own session. Three failures follow from that, and they are measured, not predicted.
+An AI agent acting for a person almost always does so by inheriting a credential — a service account, an API key, a shared token, the human's own session. Three failures follow from that.
 
-**You cannot say who is responsible.** Only 28% of organizations can trace an agent's actions back to a human sponsor across all environments, and 68% cannot reliably tell agent activity from human activity ([1](#references)).
+**You cannot say who is responsible.** 28% of organizations can reliably trace agent actions to a human or system across all environments ([1](#references)), and 68% cannot clearly distinguish AI agent activity from human activity ([2](#references)).
 
 **You cannot revoke one agent.** Agents share the credential they inherited, so cutting off a misbehaving agent cuts off everything else using it. Nobody pulls that lever, so the agent keeps its access.
 
 **You cannot constrain a sequence.** Authorization is decided one call at a time. An agent reads untrusted external content, then writes to an internal system. Both calls are legitimately authorized. The pair is an exfiltration, and no per-call check can see it.
 
-The Model Context Protocol says where its own authorization stops: it is defined at the transport level, and per-tool authorization, agent identity, delegation, and consent are out of scope. The Enterprise-Managed Authorization extension, stable since June 2026, is explicit that it governs the connection and not the individual tool call.
+The Model Context Protocol's authorization specification covers the transport — how a client gets a token for a server. It says nothing about which tool that token may call, which agent holds it, or who delegated to whom, and MCP's authorization interest group has open work on per-tool scopes and on consent across chains of agents. The Enterprise-Managed Authorization extension, stable since June 2026, gets an access token from an enterprise identity assertion, so what it produces is scoped to a server, not to a call.
 
 That gap is what Mandatum fills. Nothing else.
 
@@ -141,4 +141,5 @@ See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## References
 
-1. Cloud Security Alliance, *State of NHI and AI Security*, January 2026.
+1. Cloud Security Alliance and Strata Identity, *Securing Autonomous AI Agents*, February 2026 (n=285).
+2. Cloud Security Alliance and Aembit, *Identity and Access Gaps in the Age of Autonomous AI*, March 2026 (n=228).

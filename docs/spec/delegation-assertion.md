@@ -6,13 +6,13 @@ Status: **Draft 0.1**. Implemented, and not yet reviewed by anyone outside the p
 
 ## 1. Problem
 
-An AI agent that acts for a person today almost always does so by *inheriting a credential*: a service account, an API key, a shared OAuth token, or the human's own session. Three failures follow directly from that, and all three are measured, not hypothetical.
+An AI agent that acts for a person today almost always does so by *inheriting a credential*: a service account, an API key, a shared OAuth token, or the human's own session. Three failures follow directly from that. The first is measured; the second and third are consequences of how the credential is shared and how authorization is evaluated, and are argued rather than surveyed.
 
-1. **No attribution.** Only 28% of organizations can trace an agent's actions back to a human sponsor across all environments, and 68% cannot reliably distinguish agent activity from human activity (Cloud Security Alliance, *State of NHI and AI Security*, January 2026).
+1. **No attribution.** 28% of organizations can reliably trace agent actions to a human or system across all environments (Cloud Security Alliance and Strata Identity, *Securing Autonomous AI Agents*, February 2026; n=285), and 68% cannot clearly distinguish AI agent activity from human activity (Cloud Security Alliance and Aembit, *Identity and Access Gaps in the Age of Autonomous AI*, March 2026; n=228). Both are vendor-commissioned self-reported surveys, and neither says "human sponsor" — the first says "human or system".
 2. **No selective revocation.** Because agents share the credential they inherited, revoking one agent revokes every principal using that credential. This is the *credential piggybacking* failure mode.
 3. **No sequence-level control.** Authorization is evaluated per call. An agent can be individually authorized for every request in a series while the *series* produces an outcome nobody authorized. Current protocols cannot express a constraint over a sequence of actions, only over one action.
 
-The Model Context Protocol's own authorization layer states its scope limit explicitly: authorization is defined at the transport level, and per-tool authorization, agent identity, delegation and consent are out of scope. The Enterprise-Managed Authorization extension (stable, 2026-06-18) says the same in its own words — it governs the connection, not the individual tool call.
+The Model Context Protocol's own authorization specification covers the transport: it defines how a client obtains a token for a server, and it defines nothing about which tool that token may call, which agent is holding it, or who delegated to whom. It does not declare those out of scope — it does not mention them, and MCP's authorization interest group has active work on per-tool scopes and on consent across chains of agents. The Enterprise-Managed Authorization extension (stable, 2026-06-18) is about obtaining an access token from an enterprise identity assertion, so what it produces is scoped to a server rather than to a call. Neither document claims a limit; the limit is what they define.
 
 Mandatum addresses exactly that gap and nothing else.
 
@@ -321,7 +321,7 @@ Every decision — allow and deny — appends one record to a tamper-evident log
 
 The log is an RFC 6962-style Merkle tree. Inclusion and consistency proofs let an auditor verify that no record was altered or removed.
 
-The EU AI Act's high-risk obligations, applicable since 2026-08-02, require immutable logging and traceable delegation chains, and this section is shaped by them. It does not satisfy them: none of it is built yet. A mapping from these obligations to what the implementation actually does is worth writing once there is an implementation to map, and not before.
+The EU AI Act shapes this section, and both the date and the requirement are easy to get wrong. The Digital Omnibus (Regulation (EU) 2026/1744, in force 2026-07-27) moved the Annex III high-risk obligations to 2027-12-02 and the Annex I ones to 2028-08-02; only the Article 50 transparency duties kept the original 2026-08-02 date. What Article 12 requires of a high-risk system is automatic recording of events over its lifetime, at a level of traceability appropriate to the intended purpose. It does not say "immutable" and it does not mention delegation. A tamper-evident log of who delegated what is a reasonable way to meet a record-keeping obligation; it is not the obligation. None of this section is built yet, and a mapping from the Act's articles to what the implementation does is worth writing once there is an implementation to map.
 
 ## 11. Threat model
 
@@ -367,5 +367,6 @@ Honest list. These are unresolved and feedback is wanted.
 - draft-ietf-wimse-arch, draft-ietf-wimse-s2s-protocol
 - draft-klrc-aiagent-auth-03 — AI Agent Authentication and Authorization
 - Birgisson et al., *Macaroons: Cookies with Contextual Caveats* (2014)
-- Cloud Security Alliance, *State of NHI and AI Security* (2026-01)
-- Regulation (EU) 2024/1689 (AI Act), high-risk obligations applicable 2026-08-02
+- Cloud Security Alliance and Strata Identity, *Securing Autonomous AI Agents* (2026-02)
+- Cloud Security Alliance and Aembit, *Identity and Access Gaps in the Age of Autonomous AI* (2026-03)
+- Regulation (EU) 2024/1689 (AI Act) Article 12, as amended by Regulation (EU) 2026/1744; Annex III high-risk obligations apply from 2027-12-02
