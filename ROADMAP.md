@@ -1,6 +1,6 @@
 # Roadmap
 
-Last updated: 2026-09-12.
+Last updated: 2026-09-13.
 
 This roadmap has two tracks that run at the same time. The engineering track is the one that produces software. The community track is the one that decides whether the project survives, and it is listed first because it is the harder of the two and the one most likely to be neglected.
 
@@ -26,7 +26,7 @@ A project maintained by one person, with no users, is not a project. Two of the 
 Mandatum deliberately implements other people's standards rather than inventing its own, which means the specifications it depends on are being written now and the project should be present while that happens. Planned participation:
 
 - **OpenID AuthZEN Working Group** — the COAZ-MCP binding reached Working Group Draft in June 2026 and has few implementers. Mandatum aims to be a conformance-tested implementation and to report interoperability results back.
-- **`modelcontextprotocol/ext-auth`** — issue #14 proposes AuthZEN integration and has been open without a maintainer response since February 2026. Mandatum's MCP binding is directly relevant to it.
+- **`modelcontextprotocol/ext-auth`** — issue #15, a SEP for parameter-level authorization mapping, is the live thread; issue #14 was answered by maintainers in February 2026 with the position that nothing in it needs to enter the protocol. Mandatum's MCP binding is relevant to #15.
 - **CNCF TAG Workloads Foundation**, TOC initiative #1746, which explicitly solicits work on agent observability schemas and policy interfaces.
 - **CNCF TAG Security and Compliance**, TOC initiative #1890, on MCP authentication and authorization standards.
 - **IETF WIMSE** — Mandatum's workload identity half builds on WIMSE drafts and should report implementation status.

@@ -1,6 +1,6 @@
 # Alternatives
 
-Last updated: 2026-09-12.
+Last updated: 2026-09-13.
 
 This document exists to answer one question honestly: **does something already solve this, and should Mandatum exist?**
 
@@ -28,6 +28,8 @@ The three capabilities Mandatum claims are missing in combination:
 | IETF WIMSE drafts | no | no | n/a | The workload-identity half. Mandatum's chain rides on it. |
 | RFC 8693 token exchange | no | no | n/a | Nested `act` claims record prior actors, but §4.1 puts them out of reach: a consumer "MUST only consider the token's top-level claims and the party identified as the current actor". Prior actors are informational. See "RFC 8693 and §4.1" below. |
 | Macaroons | no | no | n/a | The origin of attenuated capabilities with offline verification. No human root, no sequence constraints, no authorization-API binding. Direct prior art. |
+| `draft-mcguinness-oauth-actor-profile-00` | no | no | n/a | Identifies the current delegated actor at the resource server, with `(act.iss, act.sub)` as the canonical identifier. Says in its own words that it does not provide per-hop cryptographic provenance, and never mentions attenuation. See "The OAuth Actor Profile drafts" below. |
+| `draft-mcguinness-oauth-actor-proofs-00` | no | no | n/a | Layers signed, hash-chained per-hop proofs on the profile above. Authenticity of participation, not evidence that authority did not widen. |
 | Biscuit | no | partial | no | Modern attenuated tokens with an embedded Datalog policy language. Closest technical relative. Attenuation is per-token; there is no sponsor root and no cross-call sequence state, and the policy language is Biscuit's own rather than a decision handed to an external PDP. |
 | OpenFGA / SpiceDB / Cerbos / OPA / Cedar | n/a | no | n/a | Engines. They answer a question. Mandatum decides what question to ask and proves the asker's authority. |
 | Guardrails libraries (guardrails-ai, NeMo) | no | partial | no | Content filtering on model input and output. Different layer; no identity, no authority, no audit of authorization decisions. |
@@ -65,6 +67,24 @@ EMA is recent, well designed, and backed by real deployments. It uses ID-JAG so 
 
 It is listed as not closing the gap because the specification states its own limit: it governs a connection, not individual tool calls, and it does not model sub-delegation. An agent that spawns a sub-agent is outside its model. Mandatum aims to compose with EMA — EMA to establish the connection, Mandatum to carry authority through the tool calls made over it — rather than to replace it.
 
+### The OAuth Actor Profile drafts
+
+Of everything in the summary table, `draft-mcguinness-oauth-actor-profile` most deserves scrutiny, because it occupies the same ground: identifying who is acting in a delegated call, at the resource server, in a standards-track document.
+
+Where it stops is stated in the draft rather than inferred here. Section 14.1:
+
+> This structure records delegated-actor history within the trust model of the issuer that conveys it; it does not, by itself, provide independent cryptographic provenance for each prior hop.
+
+And on why that is deliberate rather than an omission, section 3.7:
+
+> This profile does not define per-actor confirmation members within nested `act` objects. Stronger prior-hop key provenance, if needed, would require another profile layered on top of this one...
+
+The words "attenuation", "narrow" and "least privilege" do not appear in the document at all. It is a profile for identifying and classifying the current actor, not for constraining what that actor may do relative to whoever delegated to it.
+
+`draft-mcguinness-oauth-actor-proofs` is the layered profile that answers the provenance half: each visible hop signs its own participation, hash-chained. That is authenticity of participation. It is still not a proof that authority did not widen — an actor can sign truthfully that it participated while granting onward more than it held.
+
+So the comparison is narrow and worth stating precisely. These drafts answer "who acted, and can we trust the record of who acted". Mandatum answers "and did any of them widen". If the actor-proofs work grows a non-widening property, that would be a reason to build on it rather than beside it, and this file should record that rather than defend the separation.
+
 ### agentgateway
 
 agentgateway is the Agentic AI Foundation's gateway and handles MCP and A2A at the data plane. It could implement rooted delegation itself, and if it does, Mandatum's enforcement middleware becomes redundant.
@@ -77,7 +97,10 @@ Adjacent efforts that Mandatum should track and, where possible, feed rather tha
 
 - **draft-klrc-aiagent-auth-03** (July 2026) — authors from Okta, AWS, Ping, Zscaler, OpenAI, Defakto. Takes the position that agent authentication should compose WIMSE and OAuth rather than invent a new protocol. Mandatum agrees with that position and should align with the draft rather than diverge.
 - **draft-sharif-agent-audit-trail-00** (March 2026) — tamper-evident audit chaining for agents. Overlaps Mandatum's log section. If it matures, Mandatum should adopt it rather than define a parallel format.
-- **`modelcontextprotocol/ext-auth` issue #14** — proposes AuthZEN integration for MCP. Open since February 2026 without a maintainer response.
+- **`modelcontextprotocol/ext-auth` issue #14** — proposed AuthZEN integration for MCP in February 2026. Maintainers replied that nothing in it needs to go into the protocol itself, and the discussion moved on. An earlier version of this file said the issue had gone unanswered, which was simply wrong. The live thread is issue #15, a SEP for parameter-level authorization mapping, last active June 2026.
+- **draft-mcguinness-oauth-actor-profile-00** (30 April 2026, individual, intended Standards Track) — the closest standards work to what Mandatum does with a chain. Distinguishes the represented subject (`sub`), the OAuth client registration (`client_id`) and the current delegated actor, making `(act.iss, act.sub)` the canonical actor identifier and requiring `act.iss`, which RFC 8693 leaves optional. Unlike RFC 8693 it gives the resource server processing rules. It is worth reading before assuming Mandatum's model is unprecedented; see "The OAuth Actor Profile drafts" above for where it stops.
+- **draft-mcguinness-oauth-actor-proofs-00** (4 July 2026) — layers signed per-hop proofs on the profile above, hash-chained. Structurally the nearest thing to a Mandatum chain in the IETF space.
+- **draft-mw-oauth-actor-chain-00** — a separate proposal for actor chains over RFC 8693, discussed on the OAuth working group list. Not yet read closely here.
 - **CNCF TOC #1746** — TAG Workloads Foundation, solicits agent observability schemas and policy interfaces.
 - **CNCF TOC #1890** — TAG Security and Compliance, MCP authentication and authorization standards whitepaper.
 
