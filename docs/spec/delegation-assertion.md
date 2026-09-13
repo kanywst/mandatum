@@ -128,11 +128,13 @@ Only `sha-256` is defined. A verifier MUST reject any other prefix rather than a
 | --- | --- | --- |
 | `iss` | yes | The delegator. For depth 0 this is the sponsor's issuing authority. |
 | `sub` | yes | The delegatee. A SPIFFE ID or other stable agent identifier. |
+| `iat` | yes | Issued-at. Rule V4 compares it to the verifier's clock, so an assertion without one is treated as issued in 1970. |
+| `aud` | yes | The resource server this assertion may be presented to. Rule V9 compares it, so a chain whose leaf omits it is refused everywhere. |
 | `exp` | yes | Expiry. Must not exceed the parent's `exp`. |
 | `jti` | yes | Unique identifier. The unit of revocation. |
 | `mdt.v` | yes | Format version. `1` for this document. |
 | `mdt.root` | yes | The human sponsor. Byte-identical across every link in a chain. |
-| `mdt.parent` | yes | Hash of the parent MDA, or `null` at depth 0. |
+| `mdt.parent` | yes below depth 0 | Digest of the parent MDA. At depth 0 there is no parent: the member is **absent**. A verifier MUST treat an absent member and a `null` value identically, and MUST reject any other value at depth 0. Serializing it as the empty string is not conformant, and is a mistake this implementation made. |
 | `mdt.depth` | yes | Zero-based index of this link. It orders the chain; it does not bound it. |
 | `mdt.max_depth` | yes | How many further delegations are permitted below this assertion. Zero means the holder may act but may not sub-delegate. Falls by at least one per hop, so the sponsor's value bounds the whole chain. Never negative. |
 | `mdt.cap` | yes | Capability set. May be empty, meaning no authority. |
@@ -176,7 +178,7 @@ Two edge cases, stated because implementations otherwise guess at them:
 
 Input: an ordered chain `[MDA₀ … MDAₙ]`, a trust bundle, a revocation oracle, and the current time.
 
-- **V1 Structure.** `MDA₀.mdt.parent` is `null` and `MDA₀.mdt.depth` is 0. For every *i* > 0, `MDA(i).mdt.parent` equals `sha-256` over the compact serialization of `MDA(i-1)`.
+- **V1 Structure.** `MDA₀.mdt.parent` is absent or `null`, and `MDA₀.mdt.depth` is 0. For every *i* > 0, `MDA(i).mdt.parent` equals `sha-256` over the compact serialization of `MDA(i-1)`.
 - **V2 Custody.** For every *i* > 0, `MDA(i).iss` equals `MDA(i-1).sub`. A delegator may only delegate authority it holds.
 - **V3 Signatures.** Every MDA verifies against a key resolved for its `iss` through the SPIFFE trust bundle or the issuer's JWKS. Algorithm is taken from a fixed allowlist; `none` and symmetric algorithms are rejected.
 - **V4 Time.** For every link, `iat` ≤ now < `exp`, with a bounded skew.

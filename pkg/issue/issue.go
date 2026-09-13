@@ -7,9 +7,15 @@
 // the verifier tolerates is one whose rules are theoretical.
 //
 // Every function here refuses to produce a chain that verification would
-// reject. That is deliberate. Catching an over-broad delegation when it is
-// issued gives an error at the point where someone can fix it; catching it at
-// enforcement gives an outage.
+// reject on grounds an issuer can determine. Catching an over-broad
+// delegation when it is issued gives an error where someone can fix it;
+// catching it at enforcement gives an outage.
+//
+// Two rules are outside that. Expiry depends on when verification happens,
+// which an issuer cannot know, so an assertion backdated far enough to be
+// born expired is accepted here and refused at V4. And revocation is a
+// property of the world after issuance. Everything else that verification
+// checks about a single link or a parent-child pair is checked here first.
 package issue
 
 import (
@@ -95,6 +101,13 @@ func Sponsor(signer Signer, sponsor mda.Sponsor, g Grant) (mda.Assertion, error)
 	}
 	if sponsor.Issuer == "" || sponsor.Subject == "" {
 		return mda.Assertion{}, errors.New("issue: sponsor must have an issuer and a subject")
+	}
+	// Without an audience the chain fails V9 at every resource server it is
+	// presented to. Delegate inherits the parent's, so this is the only
+	// place the value can enter a chain.
+	if g.Audience == "" {
+		return mda.Assertion{}, errors.New(
+			"issue: a sponsor grant must name an audience; a chain without one is refused by every resource server")
 	}
 	if g.MaxDepth == nil {
 		return mda.Assertion{}, errors.New(

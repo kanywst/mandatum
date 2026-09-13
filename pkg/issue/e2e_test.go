@@ -178,6 +178,44 @@ func TestChainSurvivesTheWire(t *testing.T) {
 	}
 }
 
+// The specification says depth 0 has no parent. The field used to serialize
+// as the empty string, which is neither absence nor the null the spec named,
+// so an implementation checking for null would have rejected every sponsor
+// grant this one produces. That is the interop failure §5.1 exists to
+// prevent, and nothing was looking at the wire form.
+func TestDepthZeroOmitsTheParentOnTheWire(t *testing.T) {
+	w := newWorld(t)
+	root := w.twoHop()[0]
+
+	parts := strings.Split(string(root.Raw), ".")
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var decoded struct {
+		Mandatum map[string]any `json:"mdt"`
+	}
+	if err := json.Unmarshal(payload, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if v, present := decoded.Mandatum["parent"]; present {
+		t.Errorf("depth 0 carries parent=%#v on the wire; it should be absent", v)
+	}
+
+	// A child still commits to its parent, or nothing is holding the chain
+	// together.
+	child := w.twoHop()[1]
+	parts = strings.Split(string(child.Raw), ".")
+	payload, _ = base64.RawURLEncoding.DecodeString(parts[1])
+	if err := json.Unmarshal(payload, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if v, _ := decoded.Mandatum["parent"].(string); v == "" {
+		t.Error("a child carries no parent commitment")
+	}
+}
+
 func TestForgeryIsRejected(t *testing.T) {
 	tests := []struct {
 		name     string
