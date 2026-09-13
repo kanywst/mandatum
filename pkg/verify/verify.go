@@ -113,7 +113,9 @@ type Result struct {
 	// assembled from pieces of other chains.
 	Actors []string
 	// Capabilities is the leaf's capability set, already known to be within
-	// everything above it.
+	// everything above it. Use Permits rather than reading it directly: a
+	// caller comparing these patterns by hand is reimplementing the matcher
+	// the issuer used, and the direction that drifts in is permissive.
 	Capabilities []mda.Capability
 	// Sequence is the leaf's sequence constraints, or nil.
 	Sequence *mda.Sequence

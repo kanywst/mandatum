@@ -106,7 +106,20 @@ func Example() {
 	fmt.Println("hops:   ", res.Depth)
 	fmt.Println("revoke: ", res.LeafID)
 
-	// 4. What the retriever cannot do: widen its own grant. The refusal
+	// 4. The chain establishes what a human delegated. Before honouring any
+	//    decision, check the request is inside it. A PDP that said yes to
+	//    something no sponsor granted must not be able to make it happen,
+	//    and this call is the only thing that makes that true.
+	permitted := res.Permits(verify.Request{
+		ResourceType: "mcp_tool", ResourceID: "search.query", Action: "invoke",
+	})
+	outside := res.Permits(verify.Request{
+		ResourceType: "mcp_tool", ResourceID: "admin.wipeAll", Action: "invoke",
+	})
+	fmt.Println("granted:", permitted == nil)
+	fmt.Println("outside:", outside == nil)
+
+	// 5. What the retriever cannot do: widen its own grant. The refusal
 	//    happens at issuance, where whoever wrote it can still fix it.
 	_, retrieverKey := deterministicKey(3)
 	_, err = issue.Delegate(
@@ -130,6 +143,8 @@ func Example() {
 	// agent:   spiffe://example.org/ns/agents/retriever
 	// hops:    1
 	// revoke:  01JB2XA4M0RN5S8Q2K7T3W1Y9D
+	// granted: true
+	// outside: false
 	// escalation: true
 }
 

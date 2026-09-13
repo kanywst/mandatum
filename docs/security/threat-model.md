@@ -41,7 +41,7 @@ Stated plainly, because an unstated assumption is how a threat model becomes wro
 3. **Private keys stay private.** There is no key-compromise detection. Revocation is the recovery path, and it is only as fast as whoever notices.
 4. **Verifier clocks are roughly right.** Skew is bounded to five minutes; beyond that, expiry is unreliable in whichever direction the clock is wrong.
 5. **The trust bundle is correct.** Whoever populates it decides which issuers exist. A wrong entry is a forged chain that verifies.
-6. **The PDP is not trusted to grant.** It may deny anything and may allow only within the chain's capability set. This is enforced by ordering: verification runs first and bounds what a decision can mean.
+6. **The PDP is not trusted to grant, if the enforcement point does its part.** It may deny anything. Bounding what it can allow is not automatic and does not follow from verification: nothing in an evaluation response is constrained by the chain. The bound exists only where the PEP also calls `Result.Permits` with the request it is about to honour and refuses on its failure regardless of the PDP's answer. A PEP that verifies the chain and then does whatever the PDP says has given the PDP the sponsor's authority.
 
 ## Threats and what answers them
 
@@ -114,6 +114,7 @@ Listed because a threat model that only describes finished work is a marketing d
 - The trust bundle contains only issuers that should be able to mint authority.
 - Agents cannot read each other's private keys. Mandatum bounds what a compromised agent can *delegate*; it cannot stop one that has stolen another's key from *being* it.
 - The sponsor authority is not the same system as the agents it issues for.
+- Every enforcement point calls `Result.Permits` for the request it is about to perform, and treats its failure as a denial. Verification says who delegated what; only this call says the thing being asked for is inside it. A deployment that skips it inherits assumption 6's failure mode in full.
 
 ## Reporting
 

@@ -128,11 +128,13 @@ Only `sha-256` is defined. A verifier MUST reject any other prefix rather than a
 | --- | --- | --- |
 | `iss` | yes | The delegator. For depth 0 this is the sponsor's issuing authority. |
 | `sub` | yes | The delegatee. A SPIFFE ID or other stable agent identifier. |
+| `iat` | yes | Issued-at. Rule V4 compares it to the verifier's clock, so an assertion without one is treated as issued in 1970. |
+| `aud` | yes | The resource server this assertion may be presented to. Rule V9 compares it, so a chain whose leaf omits it is refused everywhere. |
 | `exp` | yes | Expiry. Must not exceed the parent's `exp`. |
 | `jti` | yes | Unique identifier. The unit of revocation. |
 | `mdt.v` | yes | Format version. `1` for this document. |
 | `mdt.root` | yes | The human sponsor. Byte-identical across every link in a chain. |
-| `mdt.parent` | yes | Hash of the parent MDA, or `null` at depth 0. |
+| `mdt.parent` | yes below depth 0 | Digest of the parent MDA. At depth 0 there is no parent: the member is **absent**. A verifier MUST treat an absent member and a `null` value identically, and MUST reject any other value at depth 0. Serializing it as the empty string is not conformant, and is a mistake this implementation made. |
 | `mdt.depth` | yes | Zero-based index of this link. It orders the chain; it does not bound it. |
 | `mdt.max_depth` | yes | How many further delegations are permitted below this assertion. Zero means the holder may act but may not sub-delegate. Falls by at least one per hop, so the sponsor's value bounds the whole chain. Never negative. |
 | `mdt.cap` | yes | Capability set. May be empty, meaning no authority. |
@@ -176,7 +178,7 @@ Two edge cases, stated because implementations otherwise guess at them:
 
 Input: an ordered chain `[MDA₀ … MDAₙ]`, a trust bundle, a revocation oracle, and the current time.
 
-- **V1 Structure.** `MDA₀.mdt.parent` is `null` and `MDA₀.mdt.depth` is 0. For every *i* > 0, `MDA(i).mdt.parent` equals `sha-256` over the compact serialization of `MDA(i-1)`.
+- **V1 Structure.** `MDA₀.mdt.parent` is absent or `null`, and `MDA₀.mdt.depth` is 0. For every *i* > 0, `MDA(i).mdt.parent` equals `sha-256` over the compact serialization of `MDA(i-1)`.
 - **V2 Custody.** For every *i* > 0, `MDA(i).iss` equals `MDA(i-1).sub`. A delegator may only delegate authority it holds.
 - **V3 Signatures.** Every MDA verifies against a key resolved for its `iss` through the SPIFFE trust bundle or the issuer's JWKS. Algorithm is taken from a fixed allowlist; `none` and symmetric algorithms are rejected.
 - **V4 Time.** For every link, `iat` ≤ now < `exp`, with a bounded skew.
@@ -243,7 +245,16 @@ The shape of `subject`, `action`, `resource` and `context.agent` is the COAZ-MCP
 
 `actors` answers "who was upstream". `chain` is what makes it more than a list — it commits to the exact links, so a sequence of actors cannot be reassembled from pieces of other chains. Whether the commitment is necessary, or a verified list is enough, is genuinely open; see §12.
 
-The chain is verified **before** the PDP is called. The PDP receives a statement of fact ("this agent holds a valid chain rooted in this human") and applies organizational policy on top. Separating the two means an operator can change policy without changing credential handling, and a compromised PDP cannot manufacture authority that no sponsor granted.
+The chain is verified **before** the PDP is called. The PDP receives a statement of fact ("this agent holds a valid chain rooted in this human") and applies organizational policy on top. Separating the two means an operator can change policy without changing credential handling.
+
+Verification alone does not stop a PDP granting more than the sponsor did. Nothing in an evaluation response is bounded by the chain, so a PEP that asks the PDP and enforces the answer has handed the PDP the sponsor's authority. The bound comes from a third step, and only if the PEP takes it:
+
+1. verify the chain;
+2. check the chain's capability set covers the request;
+3. ask the PDP;
+4. allow only if all three agree.
+
+A PEP MUST perform step 2 and MUST refuse on its failure whatever the PDP said. This is what "a compromised PDP cannot manufacture authority that no sponsor granted" means, and it is a property of the enforcement point's ordering rather than of the format. An implementation that skips it has the confused deputy this specification exists to prevent, wearing a valid chain.
 
 Where the OIDF COAZ-MCP binding (WG draft, June 2026) specifies a mapping from MCP tool calls to AuthZEN requests, Mandatum follows it rather than defining a parallel one. What is implemented, what is not, and the one place the output goes beyond the binding are set out in [coaz-mcp-conformance.md](coaz-mcp-conformance.md).
 
@@ -326,7 +337,7 @@ Summarized here; the full model is in `docs/security/threat-model.md`.
 | Attribution stripping | V6 root consistency; `root` cannot be dropped or rewritten. |
 | Log tampering | Merkle inclusion and consistency proofs. |
 | Sequence-state evasion | Fail-closed on state loss; state keyed by chain root, not by PEP. |
-| PDP compromise | A PDP can deny, and can allow only within the chain's capability set. It cannot widen authority. |
+| PDP compromise | A PDP may deny anything. It can widen nothing, provided the enforcement point checks the request against the chain's capability set as well as asking the PDP; see §8. Skipping that check gives the PDP the sponsor's authority. |
 
 The last row is a deliberate design property: verification precedes and constrains the policy decision, so the PDP is not fully trusted.
 

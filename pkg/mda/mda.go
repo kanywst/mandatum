@@ -54,10 +54,16 @@ type Mandatum struct {
 	// copies agree, so the duplication cannot be used to forge attribution.
 	Root Sponsor `json:"root"`
 
-	// Parent is the digest of the parent assertion's compact serialization,
-	// or empty at depth 0. It is what makes links non-interchangeable: an
-	// assertion cannot be spliced onto a chain it was not issued against.
-	Parent string `json:"parent"`
+	// Parent is the digest of the parent assertion's compact serialization.
+	// It is what makes links non-interchangeable: an assertion cannot be
+	// spliced onto a chain it was not issued against.
+	//
+	// At depth 0 there is no parent and the field is omitted. It carries
+	// omitempty for that reason: the field previously serialized as the
+	// empty string, which is neither the absence the specification means nor
+	// the null it named, and an implementation checking for null would have
+	// rejected every sponsor grant this one produces.
+	Parent string `json:"parent,omitempty"`
 
 	// Depth is this link's zero-based position in the chain. It orders the
 	// chain; it does not bound it.
