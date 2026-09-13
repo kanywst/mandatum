@@ -7,7 +7,10 @@ import (
 	"github.com/kanywst/mandatum/pkg/mda"
 )
 
-// checkAttenuation implements V5: every link must be no wider than its parent.
+// checkAttenuation implements the part of V5 that Attenuates covers. V5 is
+// defined as "every rule in section 6 holds"; rules 4 and 6 are checked as
+// V1 and V6 instead, because they are about position in a chain rather than
+// about a pair of links.
 //
 // The rules are deliberately one-directional. There is no path in this file
 // that lets a child hold authority its parent did not, which is what makes
@@ -22,10 +25,18 @@ func checkAttenuation(chain mda.Chain) error {
 	return nil
 }
 
-// Attenuates reports whether child is no wider than parent, implementing the
-// rules in specification section 6 for a single pair of links.
+// Attenuates reports whether child is no wider than parent, for the four
+// rules of specification section 6 that compare a pair of links on their own:
+// capability entailment, expiry, the depth budget, and sequence constraints.
 //
-// It is exported so that an issuer can apply the same check before signing.
+// It does not cover rule 4, that depth increments by one, or rule 6, that the
+// sponsor is byte-identical. Those are properties of a link's position in a
+// chain rather than of the pair, and are checked as V1 and V6 during chain
+// verification. An issuer calling this must therefore derive depth and the
+// sponsor from the parent rather than accept them from a caller, which is
+// what pkg/issue does.
+//
+// It is exported so that an issuer can apply the same rules before signing.
 // Two implementations of these rules — one to issue, one to verify — would
 // drift, and the direction they drift in is that the issuer becomes more
 // permissive than the verifier, producing chains that fail at a resource
