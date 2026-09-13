@@ -28,7 +28,7 @@ Stating these first, because the failure mode for a project in this space is sco
 
 ## 3. Prior art
 
-Mandatum's attenuation model is not novel and does not claim to be. Capability attenuation with offline verification is the contribution of macaroons (Birgisson et al., 2014) and, in a modern form, Biscuit. SPIFFE established cryptographic workload identity. RFC 8693 established token exchange with delegation semantics (`actor_token`, the `act` claim), and drew a line Mandatum sits outside of: §4.1 requires a consumer to consider only the current actor, and treats prior actors in nested `act` claims as informational. RFC 6962 established tamper-evident logging.
+Mandatum's attenuation model is not novel and does not claim to be. Capability attenuation that can be delegated offline, without contacting the issuer, is the contribution of macaroons (Birgisson et al., 2014) and, in a modern form, Biscuit. Macaroon *verification* is not offline: it is HMAC-chained and the verifier holds the root secret. SPIFFE established cryptographic workload identity. RFC 8693 established token exchange with delegation semantics (`actor_token`, the `act` claim), and drew a line Mandatum sits outside of: §4.1 requires a consumer to consider only the current actor, and treats prior actors in nested `act` claims as informational. RFC 6962 established tamper-evident logging; it is Experimental and obsoleted by RFC 9162, and "RFC 6962-style" here means the tree construction both share.
 
 What Mandatum adds to that body of work is narrow and specific:
 
@@ -358,7 +358,7 @@ Honest list. These are unresolved and feedback is wanted.
 - OpenID AuthZEN COAZ-MCP Binding 1.0 (Working Group Draft, 2026-06)
 - Model Context Protocol specification 2026-07-28, Authorization
 - MCP Enterprise-Managed Authorization (stable, 2026-06-18)
-- RFC 6962 — Certificate Transparency
+- RFC 6962 — Certificate Transparency (Experimental; obsoleted by RFC 9162)
 - RFC 7515 — JSON Web Signature
 - RFC 7519 — JSON Web Token
 - RFC 8693 — OAuth 2.0 Token Exchange

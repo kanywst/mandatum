@@ -16,8 +16,14 @@
 # CI checks the license identifier only. The other two conditions are a human
 # judgement and must be argued in the pull request that adds the dependency.
 #
-# Anything not on this list requires a CNCF Governing Board exception, which
-# the policy notes is rarely granted. In practice: pick a different dependency.
+# Anything not on this list requires a CNCF Governing Board exception: a
+# request on the issue template, staff triage, a Legal Committee
+# recommendation, and a Governing Board vote. The policy says nothing about
+# how often that succeeds. In practice: pick a different dependency.
+#
+# The policy's list has one entry this file cannot express, because it is not
+# an SPDX identifier: the Google patent license for Golang
+# (https://golang.org/PATENTS).
 #
 # Known traps that are NOT on this list, and that appear transitively in real
 # Go and Rust dependency trees:
