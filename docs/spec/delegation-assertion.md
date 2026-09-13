@@ -241,7 +241,7 @@ A verified chain becomes the subject context of an OpenID AuthZEN Authorization 
 
 The shape of `subject`, `action`, `resource` and `context.agent` is the COAZ-MCP default mapping for `tools/call`, unchanged. Under that binding `subject` is the principal on whose behalf access is requested and `context.agent` is the acting client, which is exactly the split a sponsor-rooted chain already has: the human goes in `subject`, the leaf agent in `context.agent`.
 
-`context.agent` carries one hop and never a chain. The binding says upstream actors are separately addressable and leaves where they go undefined, so Mandatum puts them under a vendor-prefixed key rather than inventing a name inside the binding's namespace. Its presence is itself a claim: a PEP populates it only from a chain that passed every rule in §7, so a PDP may rely on it for the same reason it may rely on `subject.id`.
+`context.agent` carries the acting client. The binding defines no place for the hops above it — it does not rule a chain out there, it does not address the question — so Mandatum puts them under a vendor-prefixed key rather than taking a name inside the binding's namespace. The question is open in [openid/authzen#612](https://github.com/openid/authzen/issues/612); see `docs/spec/coaz-mcp-conformance.md`. Its presence is itself a claim: a PEP populates it only from a chain that passed every rule in §7, so a PDP may rely on it for the same reason it may rely on `subject.id`.
 
 `actors` answers "who was upstream". `chain` is what makes it more than a list — it commits to the exact links, so a sequence of actors cannot be reassembled from pieces of other chains. Whether the commitment is necessary, or a verified list is enough, is genuinely open; see §12.
 
