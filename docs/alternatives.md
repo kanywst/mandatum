@@ -16,8 +16,8 @@ The three capabilities Mandatum claims are missing in combination:
 
 | Project or standard | R | S | N | Why it does not close the gap |
 | --- | --- | --- | --- | --- |
-| MCP core authorization (2026-07-28) | no | no | n/a | Scoped to transport. Per-tool authorization, agent identity, delegation and consent are explicitly out of scope. |
-| MCP Enterprise-Managed Authorization | partial | no | no | Stable 2026-06-18. Governs the connection, not the tool call — it says so itself. IdP-issued, so attribution exists at connect time but does not follow sub-delegation. |
+| MCP core authorization (2026-07-28) | no | no | n/a | Scoped to transport: how a client obtains a token for a server. Defines nothing about per-tool authorization, agent identity, delegation or consent — it does not declare them out of scope, it does not address them, and MCP's authorization interest group has open work on the first and last. |
+| MCP Enterprise-Managed Authorization | partial | no | no | Stable 2026-06-18. Defines how a client turns an enterprise identity assertion into an access token, so what it produces is scoped to a server rather than a tool call. Attribution exists at connect time and does not follow sub-delegation. |
 | OpenID AuthZEN Authorization API 1.0 | n/a | no | yes | The decision interface Mandatum targets, not a competitor. Defines PEP-to-PDP; says nothing about how a subject came to hold authority. |
 | AuthZEN COAZ-MCP Binding | n/a | no | yes | Working Group Draft, June 2026. Specifies the MCP-to-AuthZEN mapping. Mandatum implements it. Few implementers exist. |
 | ToolHive | no | no | no | Real per-tool authorization, but wired directly to Cedar. Engine lock-in, no delegation chain, no sequence state. |
@@ -57,7 +57,7 @@ Most rows above are clear. Three are not, and the case for Mandatum depends on t
 
 Biscuit is the strongest counterargument to building Mandatum. It has offline attenuation, cryptographic soundness, a real policy language, and an existing community.
 
-The distinction claimed here is that Biscuit attenuates *a token* while Mandatum attenuates *a chain rooted in a person*, and that Biscuit's policy evaluation is internal to the token rather than delegated to an external PDP that an organization already runs. Sequence-level constraints have no Biscuit equivalent that we found.
+The distinction claimed here is that Biscuit attenuates *a token* while Mandatum attenuates *a chain rooted in a person*, and that Biscuit evaluates policy in-process in its own Datalog rather than over a standard protocol to a PDP an organization already runs. To be precise about Biscuit, because an earlier version of this file was not: a token carries *checks*, and only the authorizer — the application — supplies `allow`/`deny` policies and runs the engine. So the token restricts; it does not decide. Sequence-level constraints have no Biscuit equivalent that we found.
 
 If those distinctions are thinner than claimed, the better path is a Biscuit profile rather than a new format. This is an open question the project would like answered by people who know Biscuit well.
 
@@ -65,13 +65,13 @@ If those distinctions are thinner than claimed, the better path is a Biscuit pro
 
 EMA is recent, well designed, and backed by real deployments. It uses ID-JAG so an identity provider issues agent authority based on organizational policy, which is genuine rooted attribution at the point of connection.
 
-It is listed as not closing the gap because the specification states its own limit: it governs a connection, not individual tool calls, and it does not model sub-delegation. An agent that spawns a sub-agent is outside its model. Mandatum aims to compose with EMA — EMA to establish the connection, Mandatum to carry authority through the tool calls made over it — rather than to replace it.
+It is listed as not closing the gap for a reason inferred here rather than stated there: an access token derived from an identity assertion is scoped to a server, so it governs a connection rather than individual tool calls, and nothing in the extension models sub-delegation. An agent that spawns a sub-agent is outside its model. Mandatum aims to compose with EMA — EMA to establish the connection, Mandatum to carry authority through the tool calls made over it — rather than to replace it.
 
 ### The OAuth Actor Profile drafts
 
 Of everything in the summary table, `draft-mcguinness-oauth-actor-profile` most deserves scrutiny, because it occupies the same ground: identifying who is acting in a delegated call, at the resource server, in a standards-track document.
 
-Where it stops is stated in the draft rather than inferred here. Section 14.1:
+Where it stops is stated in the draft rather than inferred here. Section 3.5:
 
 > This structure records delegated-actor history within the trust model of the issuer that conveys it; it does not, by itself, provide independent cryptographic provenance for each prior hop.
 
