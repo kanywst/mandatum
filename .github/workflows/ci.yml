@@ -128,7 +128,12 @@ jobs:
   dco:
     name: sign-off
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    # Dependabot does not sign off, and cannot: the DCO is a statement about
+    # a person's right to submit the work. Requiring it of the bot leaves
+    # every dependency bump red on a required check, which trains whoever is
+    # merging to override the check rather than read it. A version bump to a
+    # SHA-pinned action carries no copyright the DCO exists to cover.
+    if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
