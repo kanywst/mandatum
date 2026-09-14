@@ -14,7 +14,7 @@ Signature verification and revocation lookup are interfaces precisely so that a 
 
 | Artifact | Purpose |
 | --- | --- |
-| `mandatum-vX.Y.Z.tar.gz` | Source archive built from the signed tag. |
+| `mandatum-vX.Y.Z.tar.gz` | Source archive built from the tag, with `git archive`. The tag is annotated and **not** signed; see Known gaps. |
 | `mandatum-sbom.spdx.json` | SPDX SBOM. |
 | `checksums.txt` | SHA-256 of every artifact. |
 | `checksums.txt.bundle` | Cosign keyless signature and certificate, as a Sigstore bundle. |
@@ -42,24 +42,27 @@ The identity regexp matters. Verifying only that *something* signed the file pro
 
 | Check | When |
 | --- | --- |
-| Build, unit tests with the race detector | every push and pull request |
-| `golangci-lint` | every push and pull request |
-| Fuzzing of parsing and chain verification | every pull request, and before release |
-| Extended fuzzing campaign, crashers retained | nightly |
-| CNCF dependency license allowlist | every push and pull request, plus weekly |
-| `govulncheck` | every push and pull request, plus weekly |
-| CodeQL, `security-extended` | every push and pull request |
+| Build, unit tests with the race detector | every pull request, and every push to `main` |
+| `golangci-lint` | every pull request, and every push to `main` |
+| Fuzzing of parsing and chain verification, 60s a target | every pull request, and on the tag before a release is published |
+| Extended fuzzing campaign over every target, crashers retained | nightly |
+| CNCF dependency license allowlist | every pull request, every push to `main`, and weekly |
+| `govulncheck` | every pull request, every push to `main`, and weekly |
+| CodeQL, `security-extended` | every pull request, every push to `main`, and weekly |
 | OpenSSF Scorecard | default branch |
 | Developer Certificate of Origin sign-off | every pull request |
 | Changelog entry exists for the tag | before publishing a release |
-| `LICENSE` is the unmodified Apache-2.0 text | every push and pull request |
+| `LICENSE` is the unmodified Apache-2.0 text | every pull request, every push to `main`, and weekly |
 
-The release workflow re-runs the build, the tests and the license check on the tag rather than trusting the pull request that produced it, because the thing being published is the tag.
+The release workflow re-runs the build, the tests, a short fuzzing pass and the license check on the tag rather than trusting the pull request that produced it, because the thing being published is the tag.
+
+Nothing here is a merge gate on its own. `main` is protected and the checks are required, but a repository administrator can override that, and this project currently has one.
 
 ## Known gaps
 
 Stated because a supply-chain document that lists only strengths is marketing.
 
+- **Tags are not signed.** Releases are cut from an annotated tag, and `git tag -v` on it reports no signature. The artifacts are signed — cosign keyless, with the bundle published alongside the checksums — so what a consumer verifies is the artifact and its provenance, not the tag it was built from. Anyone who can push a tag can therefore start a release. Signing tags, and having the release workflow refuse an unsigned one, is tracked for v0.2.
 - **No third-party security review.** One is a required gate for v1.0. Until then the verifier is unreviewed by anyone outside the project.
 - **Single maintainer.** One person can currently push to the default branch and cut a release. This is the strongest argument against depending on Mandatum today, and it is why maintainers from a second organization is a v1.0 gate rather than an aspiration.
 - **No reproducible builds.** The source archive is deterministic because it is `git archive`, but there are no compiled artifacts yet, so the harder question has not been answered.

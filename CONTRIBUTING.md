@@ -20,17 +20,24 @@ Issues labelled `good first issue` are scoped so that they can be completed with
 
 ## Development
 
-Requirements: Go 1.25 or newer, `make`.
+Requirements: Go 1.24 or newer (the `go` directive in `go.mod` is the minimum, and `VERSIONING.md` says so), `make`, and three things `make verify` will not run without: `golangci-lint`, `go-licenses`, and Node for `npx markdownlint-cli2`. The first two exit 127 rather than skipping, because a lint step that quietly does nothing is worse than one that fails.
 
 ```bash
 make build     # compile
 make test      # unit tests with race detector
 make lint      # golangci-lint
 make fuzz      # short fuzzing pass over the verifier
-make verify    # everything CI runs, in the order CI runs it
+make verify    # the subset of CI you can usefully run locally
 ```
 
-Run `make verify` before opening a pull request. It is the same set of checks that gate the merge, so a green local run means no surprises.
+Run `make verify` before opening a pull request. It is a subset, not the merge gate: it covers the checks that fail most often and run fastest locally. CI additionally runs, on every pull request, all of
+
+- the coverage floor, the race detector on macOS and Windows and against `oldstable`, and `go mod tidy` leaving the tree clean;
+- `make fuzz` — which `verify` deliberately leaves out because it is slow, so run it yourself when touching parsing or verification;
+- `govulncheck`, CodeQL, `actionlint`, `zizmor`, `shellcheck`, `codespell`, and two link checkers;
+- a sign-off on every commit (`git commit -s`), the unmodified `LICENSE`, and dependency review.
+
+A green `make verify` means the fast checks pass, not that the merge will be green.
 
 ## Standards for a change
 

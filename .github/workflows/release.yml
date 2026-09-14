@@ -36,6 +36,10 @@ jobs:
           cache: false
       - run: make build
       - run: make test
+      - name: Fuzz the parsers and the verifier
+        # A tag is the last point where a crasher is cheap. Short, because
+        # this gates a release; the nightly campaign is where depth comes from.
+        run: make fuzz FUZZTIME=60s
       - name: Dependency licenses
         run: |
           go install github.com/google/go-licenses@latest
