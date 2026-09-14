@@ -97,7 +97,7 @@ Gates 3 and 4 are not negotiable and will not be waived to hit a date. A v1.0 wi
 
 ## Donation to a foundation
 
-The project intends to apply to the CNCF Sandbox. The application will be made when the v1.0 gates are met and not before, because the CNCF's own published reasons for declining applications in 2026 are precisely the conditions those gates describe: too few maintainers, no adopters, and insufficient community activity.
+The project intends to apply to the CNCF Sandbox. The application will be made when the v1.0 gates are met and not before. Sandbox applications are postponed one at a time, with reasons given per application in the `cncf/sandbox` issue rather than in any published summary, so the gates below are this project's own judgement of what a serious application looks like and not a checklist taken from anywhere. Note that adopters are an Incubation criterion, not a Sandbox one; the gate exists because shipping a security format nobody has run is a bad idea, not because the CNCF asks.
 
 Preparatory work already done or planned:
 

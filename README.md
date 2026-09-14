@@ -96,7 +96,7 @@ The failure mode for a project in this space is drifting into categories that ar
 
 ## Prior art, honestly
 
-Attenuated capabilities with offline verification are the contribution of macaroons and, in modern form, Biscuit. SPIFFE established workload identity. RFC 8693 established delegation semantics for token exchange, and drew a line this project sits outside of: its §4.1 tells a resource server to authorize the current actor and treat prior actors as informational. Mandatum authorizes on the history instead, with its own verifiable credential rather than by reinterpreting `act`. That is an extension of the RFC 8693 model, not a reading of it, and [`docs/alternatives.md`](docs/alternatives.md) says so at length.
+Attenuated capabilities that can be delegated without contacting the issuer are the contribution of macaroons and, in modern form, Biscuit. SPIFFE established workload identity. RFC 8693 established delegation semantics for token exchange, and drew a line this project sits outside of: its §4.1 tells a resource server to authorize the current actor and treat prior actors as informational. Mandatum authorizes on the history instead, with its own verifiable credential rather than by reinterpreting `act`. That is an extension of the RFC 8693 model, not a reading of it, and [`docs/alternatives.md`](docs/alternatives.md) says so at length.
 
 What is new here is narrow: a chain **rooted in an authenticated human** that survives arbitrary sub-delegation, **constraints evaluated over a sequence** of actions rather than one call, and a **binding to AuthZEN** so the chain is input to any conformant engine instead of one vendor's.
 

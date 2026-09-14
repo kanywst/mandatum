@@ -31,7 +31,7 @@ Mandatum はまさにこの隙間だけを扱います。
 
 ## 3. 先行研究
 
-Mandatum の減衰モデルは新規ではなく、新規だとも主張しません。オフライン検証を伴うケーパビリティ減衰は macaroons（Birgisson et al., 2014）の、そして現代的な形では Biscuit の貢献です。SPIFFE は暗号学的なワークロード識別を確立しました。RFC 8693 は委任セマンティクス（`actor_token`、`act` クレーム）を伴うトークン交換を確立し、同時に Mandatum がその外側に位置することになる線を引きました。§4.1 は消費者に現在のアクターのみを考慮するよう要求し、nested `act` に入る過去のアクターを参考情報として扱います。RFC 6962 は改竄検知可能なログを確立しました。
+Mandatum の減衰モデルは新規ではなく、新規だとも主張しません。発行者に問い合わせずオフラインで委任できるケーパビリティ減衰は macaroons（Birgisson et al., 2014）の、そして現代的な形では Biscuit の貢献です。なお macaroon の*検証*はオフラインではありません。HMAC 連鎖であり、検証者はルート秘密を保持します。SPIFFE は暗号学的なワークロード識別を確立しました。RFC 8693 は委任セマンティクス（`actor_token`、`act` クレーム）を伴うトークン交換を確立し、同時に Mandatum がその外側に位置することになる線を引きました。§4.1 は消費者に現在のアクターのみを考慮するよう要求し、nested `act` に入る過去のアクターを参考情報として扱います。RFC 6962 は改竄検知可能なログを確立しました。同 RFC は Experimental であり RFC 9162 によって廃止されています。ここでの「RFC 6962 形式」とは両者が共有するツリー構成を指します。
 
 Mandatum がこの蓄積に加えるものは狭く、具体的です。
 
@@ -361,7 +361,7 @@ OIDF の COAZ-MCP バインディング（WG Draft, 2026年6月）が MCP ツー
 - OpenID AuthZEN COAZ-MCP Binding 1.0 (Working Group Draft, 2026-06)
 - Model Context Protocol specification 2026-07-28, Authorization
 - MCP Enterprise-Managed Authorization (stable, 2026-06-18)
-- RFC 6962 — Certificate Transparency
+- RFC 6962 — Certificate Transparency（Experimental、RFC 9162 により廃止）
 - RFC 7515 — JSON Web Signature
 - RFC 7519 — JSON Web Token
 - RFC 8693 — OAuth 2.0 Token Exchange
@@ -376,4 +376,4 @@ OIDF の COAZ-MCP バインディング（WG Draft, 2026年6月）が MCP ツー
 
 ---
 
-*translated-from: sha-256:32c2b19438fff7a76776a260814fd3c92a06eb7cc64bd6d3e1b0d5abb6b4d8c7*
+*translated-from: sha-256:2020e8169391356fb0addb22d30fd489be6f09137eb1fb7508806bc26b6d922a*
