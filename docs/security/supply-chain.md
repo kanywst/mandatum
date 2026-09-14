@@ -50,7 +50,7 @@ The identity regexp matters. Verifying only that *something* signed the file pro
 | `govulncheck` | every pull request, every push to `main`, and weekly |
 | CodeQL, `security-extended` | every pull request, every push to `main`, and weekly |
 | OpenSSF Scorecard | default branch |
-| Developer Certificate of Origin sign-off | every pull request |
+| Developer Certificate of Origin sign-off | every pull request except Dependabot's, which cannot sign off |
 | Changelog entry exists for the tag | before publishing a release |
 | `LICENSE` is the unmodified Apache-2.0 text | every pull request, every push to `main`, and weekly |
 
