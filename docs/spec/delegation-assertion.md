@@ -22,7 +22,7 @@ Stating these first, because the failure mode for a project in this space is sco
 
 - **Not a new authorization engine.** Mandatum never decides. It carries the facts a decision needs and calls a Policy Decision Point that already exists (OPA, Cedar, OpenFGA, SpiceDB, Cerbos, or any AuthZEN-conformant PDP).
 - **Not a new wire protocol.** Delegation is expressed with JOSE, issued with RFC 8693 token exchange, and evaluated with the OpenID AuthZEN Authorization API 1.0. Where an existing standard fits, Mandatum uses it unchanged. The one place it deliberately goes beyond a standard is §3.1.
-- **Not a gateway.** Mandatum ships as a library and as middleware. It is meant to run *inside* agentgateway, ToolHive, an MCP server, or an agent runtime — not to replace any of them.
+- **Not a gateway.** Mandatum ships as a library, and is meant to run *inside* agentgateway, ToolHive, an MCP server, or an agent runtime rather than replace any of them. Middleware that plugs it into an MCP server is on the roadmap and does not exist yet.
 - **Not a registry, sandbox, or agent runtime.** Those categories are occupied.
 - **Not a blockchain.** The audit log is an RFC 6962-style Merkle tree. There is no consensus protocol, no network, and no token.
 

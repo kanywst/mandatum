@@ -91,7 +91,7 @@ sequenceDiagram
 
 - **認可エンジンではない。** Mandatum は判定を一切しません。事実を確立し、既存の Policy Decision Point に渡すだけです。OPA、Cedar、OpenFGA、SpiceDB、Cerbos、あるいは OpenID AuthZEN Authorization API に準拠した任意の実装。エンジンは隙間ではありません。
 - **新しいプロトコルではない。** アサーションは JOSE、発行は RFC 8693、ワークロード識別は SPIFFE、判定は AuthZEN、ログは RFC 6962。既存標準が合う場所では、それをそのまま使います。
-- **ゲートウェイ・レジストリ・サンドボックス・エージェントランタイムではない。** それらのカテゴリは混雑しています。Mandatum はライブラリとミドルウェアであり、agentgateway や ToolHive、MCP サーバの**内側で**動くことを意図しています。
+- **ゲートウェイ・レジストリ・サンドボックス・エージェントランタイムではない。** それらのカテゴリは混雑しています。Mandatum はライブラリであり、agentgateway や ToolHive、MCP サーバの**内側で**動くことを意図しています。それを呼び出す MCP ミドルウェアはロードマップ上にあり、まだ書かれていません。
 - **ブロックチェーンではない。** 監査ログは Merkle ツリーです。合意形成もネットワークもトークンもありません。
 
 ## 先行研究について正直に
@@ -148,4 +148,4 @@ Issue と Pull Request は日本語で書いても構いません。ただしコ
 
 ---
 
-*translated-from: sha-256:493c0246c719888f9fb9c8c7435537df6e9b90aba198dea899dede776d10fff1*
+*translated-from: sha-256:65c639779dce34fd4e651982092e294d793b52bdf5b48c76bdda4bb50ffc3e41*

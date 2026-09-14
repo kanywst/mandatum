@@ -141,7 +141,19 @@ jobs:
           See CHANGELOG.md for what changed, including which Delegation
           Assertion format versions this release accepts and issues.
           EOF
+          # A SemVer pre-release identifier is the hyphen after the patch
+          # number. VERSIONING.md says a pre-release carries no compatibility
+          # promise and is not supported, and a release GitHub serves as
+          # "Latest" contradicts that no matter what the notes say. v0.1.0-rc.1
+          # and rc.2 were both published as full releases because this was
+          # decided by hand and nobody was checking.
+          prerelease=()
+          case "$TAG" in
+            *-*) prerelease=(--prerelease) ;;
+          esac
+
           gh release create "$TAG" \
             --title "$TAG" \
             --notes-file "$notes" \
+            "${prerelease[@]}" \
             dist/*
