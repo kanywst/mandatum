@@ -63,8 +63,13 @@ security-testing:
     integration:
       ad-hoc: true
       ci: true
-      before-release: true
-    comment: Known-vulnerability scanning of the Go dependency graph, weekly and on change.
+      before-release: false
+    comment: |
+      Known-vulnerability scanning of the Go dependency graph, weekly and on
+      change. Not on the release path: the release workflow re-runs the build,
+      the tests, a fuzzing pass and the license check on the tag, and does not
+      re-run this. A disclosure landing between the last main build and a tag
+      would not be caught by the tag.
   - tool-type: sast
     tool-name: CodeQL
     tool-version: latest

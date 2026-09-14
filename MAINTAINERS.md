@@ -20,7 +20,7 @@ Area-scoped Reviewers and Approvers are recorded in `OWNERS` files alongside the
 
 ## Security Response Team
 
-Members of the Security Response Team and the process they follow are documented in [SECURITY.md](SECURITY.md).
+The team is listed below; the process it follows, including timelines and embargo handling, is in [SECURITY.md](SECURITY.md).
 
 | Name | GitHub ID |
 | --- | --- |

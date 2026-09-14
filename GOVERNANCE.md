@@ -50,6 +50,8 @@ A Maintainer whose employment changes MUST update the Company column of `MAINTAI
 
 Most decisions are made by **lazy consensus**: a proposal is made publicly, and if no Maintainer objects within the comment period, it carries. Anyone may raise a concern; only a Maintainer can block.
 
+With one Maintainer, lazy consensus and a supermajority vote are the same thing, and that thing is one person deciding. This document describes the process the project intends to run under and will run under once §5's organizational balance is met; today it describes an intention. Read `MAINTAINERS.md` for who that is, and treat every rule below that counts Maintainers as unexercised.
+
 | Decision | Mechanism | Comment period |
 | --- | --- | --- |
 | Routine change | Approver review, lazy consensus | none |

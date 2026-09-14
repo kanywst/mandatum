@@ -58,7 +58,9 @@ A green `make verify` means the fast checks pass, not that the merge will be gre
 4. Open the pull request. Describe what problem it solves and how you know it works. Link the issue.
 5. Address review. Push additional commits rather than force-pushing during review, so reviewers can see what changed.
 
-Every pull request needs approval from an Approver for the areas it touches. Changes to the verifier, the wire format, or cryptographic handling need approval from a Maintainer.
+Every pull request needs approval from an Approver for the areas it touches, and changes to the verifier, the wire format, or cryptographic handling need approval from a Maintainer.
+
+That rule has nobody to apply it yet. There are no Approvers, there is one Maintainer, and `main`'s branch protection requires status checks but not a review — so every pull request merged so far was merged by its own author. The rule is written down because it is what the project intends to run under, not because it is running. Until a second Maintainer exists, an outside contributor's pull request is reviewed by the Maintainer and the Maintainer's own is reviewed by CI and whoever comments, which is a real weakness and is listed as one in `docs/security/supply-chain.md`.
 
 ## Language
 
