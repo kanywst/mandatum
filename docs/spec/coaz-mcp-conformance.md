@@ -21,12 +21,13 @@ The binding is a working group draft and will move. Anything here can become wro
 
 The subject-identity claim deserves a note. The binding says `subject.id` is conventionally `$token.sub`, and that a deployment issuing tokens with the agent as principal MAY designate an on-behalf-of claim instead so that `subject.id` carries the human. A Mandatum chain has the human at its root by construction, so the sponsor is used directly and no claim designation is needed. A deployment that also uses OAuth for the same call should make sure the two agree on who the subject is.
 
-Arguments and the server identifier go in `resource.properties`, which the binding permits and does not require.
+Arguments and the server identifier go in `resource.properties`. The binding does not define them there. Its default `tools/call` mapping is a fixed object with no `properties` on either subject or resource, and the place it provides for projecting `$params.arguments` is a declared mapping, which this project does not implement. So these fields are ours, and §Divergences says so.
 
 ## What is not implemented
 
-- **Only `tools/call`.** The binding also gives default mappings for `tools/list`, resources, prompts, completion, logging, tasks, pass-through operations, unknown methods and server-initiated requests. None of those are mapped.
-- **No declared mappings.** The binding lets a tool declare an `x-coaz-mapping` in its `inputSchema`, with CEL expressions over `params` and `token`. Mandatum reads neither, so a tool that declares a mapping is authorized by the default mapping instead. This is a real gap for parameter-level policy, and it is the next thing to build here.
+- **Only `tools/call`.** The binding gives default mappings for `tools/list`, `resources/list`, `resources/read`, `resources/subscribe`, `resources/unsubscribe`, `prompts/list`, `prompts/get`, `completion/complete`, `logging/setLevel`, and the four `tasks/*` methods as well. None of those are mapped.
+- **Neither of the binding's two catch-all behaviours.** `ping` and `notifications/*` are pass-through: "the PEP MUST NOT call the PDP for them and MUST allow them to proceed". A method with neither a default nor a declared mapping "MUST be denied". Both are normative PEP requirements rather than mappings, and a PEP built on this library has to implement them itself, fail-closed included. Server-initiated requests need nothing: the binding puts them out of scope for this version.
+- **No declared mappings.** The binding lets a tool declare an `x-authzen-mapping` in its `inputSchema`, with CEL expressions over `params` and `token`. Mandatum reads neither, so a tool that declares a mapping is authorized by the default mapping instead. This is a real gap for parameter-level policy, and it is the next thing to build here.
 - **No CEL.** Follows from the above.
 - **No Access Evaluations batching.** Single evaluation only; the binding's multi-evaluation examples are not supported.
 
@@ -34,15 +35,17 @@ Arguments and the server identifier go in `resource.properties`, which the bindi
 
 `context` carries a vendor-prefixed `mandatum.delegation` object alongside `context.agent`.
 
-This is an addition, not a divergence. The binding states that `context.agent` names one acting client and never a chain, and that upstream actors are separately addressable — without saying where they go. The prefixed key stays out of the binding's namespace so a future version of the binding cannot collide with it, and so a PDP reading only what the binding defines is unaffected.
+What the binding says about `context.agent` is that it carries the agent identity, typically `$token.?client_id`, and that separating it from `subject` lets a policy judge the user and the agent independently. It defines no place for the hops in between. It does not say one exists, or that a chain does not belong in `context.agent`; it simply does not address the question, and this project should not put words in it. The prefixed key stays out of the binding's namespace so a future version cannot collide with it, and so a PDP reading only what the binding defines is unaffected.
 
-Whether the binding should define a place for it is open. The discussion is the `context.agent` trust-semantics thread, [openid/authzen#612](https://github.com/openid/authzen/issues/612) — the same issue is cited elsewhere in this repository for a separate, settled point about RFC 8693 §4.1, so the part that matters here is the resolution that upstream actors are "separately addressable" without saying where. If the binding names a place, this object moves there and this document records the move.
+Whether the binding should define a place for it is open, and being discussed in the `context.agent` trust-semantics thread, [openid/authzen#612](https://github.com/openid/authzen/issues/612). The editor has proposed there that `context.agent` "never carries a delegation chain" and that "upstream actors are separately addressable", which is the reading this document assumed before checking. That is a proposal in an open issue awaiting a chair's read, not binding text and not a resolution. If it lands, this object moves wherever the binding names, and this document records the move.
 
 ## Divergences
 
-None known.
+One, and it is ours rather than the binding's.
 
-That is a claim about the default `tools/call` mapping, which is the only part implemented. It has not been checked against an interoperability suite, and the AuthZEN conformance program does not yet cover this binding. Until it does, "none known" means the mapping was read from the draft and implemented field by field, with a test asserting each field, and nothing more.
+`resource.properties` and `subject.properties` in the emitted request are not part of the default `tools/call` mapping, which is a fixed object with neither. The binding's own mechanism for projecting arguments into a request is a declared mapping, and the section on omitted inputs is explicit that a decision covers only the request the selected mapping constructed. Sending more than the mapping defines does not break a PDP that ignores unknown members, but it is a wider request than the binding specifies, and a policy written against these fields would not port to a conforming PEP.
+
+The mapping's six defined fields match field for field. That has not been checked against an interoperability suite, and the AuthZEN conformance program does not yet cover this binding. Until it does, the claim means the mapping was read from the draft and implemented field by field, with a test asserting each field, and nothing more.
 
 ## How to check
 
