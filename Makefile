@@ -72,7 +72,7 @@ tidy: ## Tidy and verify module dependencies
 	fi
 
 .PHONY: verify
-verify: build test lint license-check markdown doc-refs translations-check ## Everything CI runs, in CI's order
+verify: build test lint license-check markdown doc-refs translations-check ## The fast subset of CI, runnable locally
 	@echo "verify: ok"
 
 .PHONY: clean
