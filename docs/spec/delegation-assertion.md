@@ -180,7 +180,7 @@ Input: an ordered chain `[MDA₀ … MDAₙ]`, a trust bundle, a revocation orac
 
 - **V1 Structure.** `MDA₀.mdt.parent` is absent or `null`, and `MDA₀.mdt.depth` is 0. For every *i* > 0, `MDA(i).mdt.parent` equals `sha-256` over the compact serialization of `MDA(i-1)`.
 - **V2 Custody.** For every *i* > 0, `MDA(i).iss` equals `MDA(i-1).sub`. A delegator may only delegate authority it holds.
-- **V3 Signatures.** Every MDA verifies against a key resolved for its `iss` through the SPIFFE trust bundle or the issuer's JWKS. Algorithm is taken from a fixed allowlist; `none` and symmetric algorithms are rejected.
+- **V3 Signatures.** Every MDA verifies against a key resolved for its `iss` through the SPIFFE trust bundle or the issuer's JWKS. Algorithm is taken from a fixed allowlist; `none` and symmetric algorithms are rejected. Which document belongs to which issuer is configuration held by the verifier. A verifier MUST NOT discover it from the assertion, and MUST NOT dereference the issuer identifier to find it: an assertion that names where its own key comes from verifies against a key its holder generated.
 - **V4 Time.** For every link, `iat` ≤ now < `exp`, with a bounded skew.
 - **V5 Attenuation.** Every rule in §6 holds.
 - **V6 Root consistency.** `mdt.root` is byte-identical across all links.
@@ -196,7 +196,33 @@ V7 is redundant in the current rule set: V5 forces `max_depth` to fall by at lea
 
 Revoking any `jti` invalidates that link **and every chain that descends from it**, because descendants commit to it through `mdt.parent`. This is the property that answers credential piggybacking: a sponsor can kill one agent's authority, including everything it sub-delegated, without touching sibling chains or any other principal.
 
-Revocation state is distributed as a compact set (a Bloom filter with a published false-positive rate, plus an exact fallback lookup) so that PEPs can evaluate V8 locally. A false positive denies rather than allows.
+Revocation state is distributed as a compact set so that a PEP can evaluate V8 locally rather than calling a service on the path of every authorized action. The set is a Bloom filter with a published false-positive rate, and a false positive denies unless the verifier has an exact lookup to resolve it against.
+
+The encoding is normative, because two implementations that index bits differently produce sets neither can read, and the way that fails is that one of them stops honouring revocations rather than that it errors.
+
+```json
+{
+  "v": 1,
+  "sequence": 42,
+  "generated_at": 1789200000,
+  "hashes": 7,
+  "bits": "3q2-7w"
+}
+```
+
+| Member | Meaning |
+| --- | --- |
+| `v` | Format version. A verifier MUST reject a version it does not implement rather than guess. |
+| `sequence` | Monotonic publication counter. A verifier MUST refuse a set whose sequence is below the one it holds: accepting one reinstates every identifier revoked in between. |
+| `generated_at` | Seconds since the epoch. A verifier MUST treat a set older than its configured maximum age as an error, not as an empty set. |
+| `hashes` | *k*, the number of bit positions each identifier maps to. |
+| `bits` | The filter, base64url without padding as in §5.1. Its length in bits is *m*. |
+
+For an identifier *jti*, let *h* = SHA-256(*jti*), let *h₁* and *h₂* be the first and second eight bytes of *h* read big-endian, and let the *i*-th bit position, for *i* from 0 to *k*−1, be (*h₁* + *i*·*h₂*) mod *m*. The publisher sets every position for every revoked identifier; a verifier reports "may be revoked" only if every position is set.
+
+Sizing is the publisher's choice, and the standard relations *m* = −*n*·ln *p* / (ln 2)² and *k* = (*m*/*n*)·ln 2 give a set whose false-positive rate is *p* at *n* revocations. The rate is a property of the published set, so a verifier does not need to be told it.
+
+A false negative is impossible by construction, which is the property that makes the fast path safe: an identifier the filter rejects was not in the set the publisher built, so no lookup is needed and none is made.
 
 ## 8. AuthZEN binding
 

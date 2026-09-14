@@ -74,7 +74,7 @@ Mandatum runs inside existing infrastructure rather than replacing it.
 - Plugin for agentgateway
 - Integration with ToolHive
 - Middleware for the reference MCP server implementations
-- Revocation distribution suitable for multiple enforcement points
+- ~~Revocation distribution suitable for multiple enforcement points~~ done: `pkg/revoke` publishes and reads the compact set of specification §7.1, so a PEP evaluates V8 locally. What is not done is the service that publishes it on a schedule and the transport that gets it there.
 - Deployment documentation for Kubernetes
 
 Gates: at least one integration merged or endorsed upstream by that project's maintainers.
