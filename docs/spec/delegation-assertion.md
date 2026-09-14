@@ -40,7 +40,7 @@ If a reviewer concludes that an existing project already does these three things
 
 ### 3.1 Relationship to RFC 8693 §4.1
 
-Mandatum authorizes on a delegation history at the resource server. RFC 8693 §4.1 says not to do that with nested `act` claims: a consumer "MUST only consider the token's top-level claims and the party identified as the current actor", and prior actors are "informational only and are not to be considered in access control decisions".
+Mandatum authorizes on a delegation history at the resource server. RFC 8693 §4.1 says not to do that with nested `act` claims: a consumer "MUST only consider the token's top-level claims and the party identified as the current actor by the `act` claim", and prior actors are "informational only and are not to be considered in access control decisions".
 
 There is no conflict, because Mandatum does not use `act` for this. A chain is a separate credential whose links are independently signed, commit to their parents by hash, and are checked to have narrowed at every hop. RFC 8693 asks a resource server to trust the authorization server's judgement, recorded once at issuance and gated by `may_act`; a Mandatum chain carries evidence the resource server checks for itself.
 
