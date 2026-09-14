@@ -126,6 +126,18 @@ func (w *world) twoHop() mda.Chain {
 	return mda.Chain{root, child}
 }
 
+// sign serializes claims under a signer's key, as an issuer that is not this
+// package would. Tests that need a link saying something issue.Delegate
+// refuses have to produce it themselves.
+func (w *world) sign(signer issue.Signer, claims mda.Claims) mda.Assertion {
+	w.t.Helper()
+	raw, err := jose.Sign(claims, signer.Key, signer.KeyID)
+	if err != nil {
+		w.t.Fatal(err)
+	}
+	return mda.Assertion{Raw: raw, Claims: claims}
+}
+
 func TestRealChainVerifies(t *testing.T) {
 	w := newWorld(t)
 	chain := w.twoHop()

@@ -1,11 +1,12 @@
 // Package verify implements chain verification for Mandatum Delegation
 // Assertions, rules V1 through V9 of docs/spec/delegation-assertion.md.
 //
-// The package deliberately has no dependencies beyond the standard library
-// and pkg/mda. Signature verification and revocation lookup are interfaces,
-// so the chain logic — the part where a mistake grants authority nobody
-// delegated — can be read, reviewed and fuzzed without a JOSE implementation
-// in the way.
+// The package deliberately has no dependencies beyond the standard library,
+// pkg/mda, and pkg/jose for the one sentinel that distinguishes a bad JOSE
+// header from a malformed serialization. Signature verification and
+// revocation lookup are interfaces, so the chain logic — the part where a
+// mistake grants authority nobody delegated — can be read, reviewed and
+// fuzzed without a JOSE implementation in the way.
 //
 // Every exported failure names the specification rule it comes from, so a
 // denial can be traced to a clause rather than to a stack trace.
@@ -17,6 +18,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/kanywst/mandatum/pkg/jose"
 	"github.com/kanywst/mandatum/pkg/mda"
 )
 
@@ -141,13 +143,36 @@ func (v *Verifier) Verify(ctx context.Context, chain mda.Chain) (*Result, error)
 		return nil, ruleErr("V1", -1, "an empty chain establishes nothing")
 	}
 
-	// Structural checks run first. They are cheap, they touch only the
-	// assertion's own contents, and rejecting here avoids doing crypto on
-	// input that could never be valid.
+	// Claims are re-derived from the bytes rather than taken from the caller.
+	// V3 verifies a signature over Raw, so Raw is the only part of an
+	// Assertion an issuer vouched for; Assertion.Claims is a field anyone can
+	// set. Evaluating what was handed in would mean the whole rule set runs
+	// against claims nobody signed, and the correct signature over the
+	// untouched bytes would make it look checked.
+	parsed := make(mda.Chain, len(chain))
 	for i, a := range chain {
 		if len(a.Raw) == 0 {
 			return nil, ruleErr("V1", i, "assertion has no serialization to commit to")
 		}
+		claims, err := mda.ParseClaims(a.Raw)
+		if err != nil {
+			// The algorithm allowlist and the media type are V3's business,
+			// even though reading them happens here. Everything else Parse
+			// refuses is a malformed serialization, which is V1.
+			rule := "V1"
+			if errors.Is(err, jose.ErrHeader) {
+				rule = "V3"
+			}
+			return nil, ruleErr(rule, i, err.Error())
+		}
+		parsed[i] = mda.Assertion{Raw: a.Raw, Claims: claims}
+	}
+	chain = parsed
+
+	// Structural checks run next. They are cheap, they touch only the
+	// assertion's own contents, and rejecting here avoids doing crypto on
+	// input that could never be valid.
+	for i, a := range chain {
 		if err := a.Claims.Validate(); err != nil {
 			return nil, ruleErr("V1", i, err.Error())
 		}

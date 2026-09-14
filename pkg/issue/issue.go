@@ -241,19 +241,12 @@ func sign(claims mda.Claims, signer Signer) (mda.Assertion, error) {
 // in order, sponsor first.
 //
 // The claims it returns are unverified. Pass the result to verify.Verify
-// before relying on anything in it.
+// before relying on anything in it; the verifier re-derives claims from the
+// bytes rather than trusting what it is handed, so this is a convenience
+// rather than a step that establishes anything.
+//
+// Deprecated: use mda.ParseChain. This forwards to it and will be removed
+// before v1.0.
 func ParseChain(serializations [][]byte) (mda.Chain, error) {
-	chain := make(mda.Chain, 0, len(serializations))
-	for i, raw := range serializations {
-		_, payload, err := jose.Parse(raw)
-		if err != nil {
-			return nil, fmt.Errorf("issue: link %d: %w", i, err)
-		}
-		var claims mda.Claims
-		if err := unmarshalStrict(payload, &claims); err != nil {
-			return nil, fmt.Errorf("issue: link %d: %w", i, err)
-		}
-		chain = append(chain, mda.Assertion{Raw: raw, Claims: claims})
-	}
-	return chain, nil
+	return mda.ParseChain(serializations)
 }
