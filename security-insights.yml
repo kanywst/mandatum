@@ -8,8 +8,8 @@
 header:
   schema-version: 1.0.0
   expiration-date: '2027-09-12T00:00:00.000Z'
-  last-updated: '2026-09-13'
-  last-reviewed: '2026-09-13'
+  last-updated: '2026-09-15'
+  last-reviewed: '2026-09-15'
   project-url: https://github.com/kanywst/mandatum
   license: https://github.com/kanywst/mandatum/blob/main/LICENSE
   changelog: https://github.com/kanywst/mandatum/blob/main/CHANGELOG.md

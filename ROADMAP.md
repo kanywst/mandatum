@@ -43,7 +43,7 @@ The verifier is the security core. It ships first, alone, so that it can be revi
 - Continuous fuzzing of parsing and verification
 - A negative-test corpus: every rule in the specification has a test that proves a chain violating it is rejected
 
-Gates: fuzzing runs clean for 24 hours; every specification rule has a corresponding negative test; the threat model is published.
+Gates: every specification rule has a corresponding negative test; the threat model is published; and each fuzz target has accumulated at least 24 hours with no crasher. Cumulative, because a single run cannot: a GitHub Actions job is capped at six hours, so the gate is met by the nightly campaign plus a long `workflow_dispatch` run per target before the tag, and the total is recorded in the release notes rather than asserted here.
 
 ### v0.2 — AuthZEN and MCP binding (2027 Q1)
 
