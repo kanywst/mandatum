@@ -48,6 +48,9 @@ const (
 // the issuer identifier: an assertion that could name where its own key comes
 // from is an assertion that verifies against a key its holder generated.
 //
+// Fetches for one issuer are serialized, so a burst of assertions naming an
+// unseen key costs one request rather than one each.
+//
 // The zero value is not usable; call NewJWKS.
 type JWKS struct {
 	sources map[string]string
@@ -59,18 +62,35 @@ type JWKS struct {
 	now        func() time.Time
 
 	mu    sync.Mutex
-	cache map[string]*keySet
+	cache map[string]*issuerState
+}
+
+// issuerState is what this resolver remembers about one issuer.
+type issuerState struct {
+	// fetchMu serializes fetches for this issuer, so a burst of assertions
+	// naming an unseen kid produces one request rather than one each. Without
+	// it, an attacker sends a thousand forged assertions and this resolver
+	// sends a thousand requests to the issuer on their behalf.
+	fetchMu sync.Mutex
+
+	// The rest is guarded by JWKS.mu.
+	set       *keySet
+	lastTried time.Time
+	// highestSequence is the ratchet floor. Once a document has declared a
+	// sequence, no later document for this issuer may sit below it - including
+	// one that declares none at all, which is how the ratchet would otherwise
+	// be reset: a single response with the member stripped leaves the floor at
+	// zero and every replay after it acceptable.
+	highestSequence uint64
 }
 
 type keySet struct {
 	// keys is keyed the same way KeyRing keys are: kid, with "" meaning the
 	// document published exactly one usable key and an assertion may omit
 	// `kid`.
-	keys       map[string]ed25519.PublicKey
-	fetchedAt  time.Time
-	lastTried  time.Time
-	sequence   uint64
-	fetchedURL string
+	keys      map[string]ed25519.PublicKey
+	fetchedAt time.Time
+	sequence  uint64
 }
 
 // JWKSOption configures a JWKS resolver.
@@ -117,7 +137,7 @@ func NewJWKS(opts ...JWKSOption) *JWKS {
 		minRefresh: defaultJWKSMinRefresh,
 		maxBytes:   defaultJWKSMaxBytes,
 		now:        time.Now,
-		cache:      map[string]*keySet{},
+		cache:      map[string]*issuerState{},
 	}
 	for _, o := range opts {
 		o(j)
@@ -149,6 +169,10 @@ func (j *JWKS) AddSource(issuer, jwksURL string) error {
 	j.mu.Lock()
 	defer j.mu.Unlock()
 	j.sources[issuer] = u.String()
+	// A new source is a new authority for this issuer's keys, so what was
+	// cached under the old one - including the sequence floor - no longer
+	// applies. This is an operator action, not something an assertion can
+	// cause.
 	delete(j.cache, issuer)
 	return nil
 }
@@ -191,26 +215,29 @@ func (j *JWKS) key(ctx context.Context, issuer, kid string) (ed25519.PublicKey, 
 		j.mu.Unlock()
 		return nil, fmt.Errorf("%w: no key source registered for issuer %q", ErrUnknownKey, issuer)
 	}
-	set := j.cache[issuer]
-	now := j.now()
+	st := j.cache[issuer]
+	if st == nil {
+		st = &issuerState{}
+		j.cache[issuer] = st
+	}
+	if k, done, err := j.lookupLocked(st, issuer, kid); done {
+		j.mu.Unlock()
+		return k, err
+	}
+	j.mu.Unlock()
 
-	fresh := set != nil && now.Sub(set.fetchedAt) < j.ttl
-	if fresh {
-		if k, found := set.keys[kid]; found {
-			j.mu.Unlock()
-			return k, nil
-		}
-		// An unknown kid under a fresh document means either a rotation this
-		// verifier has not seen, or an attacker naming a key that does not
-		// exist. Refetch for the first, rate-limited because of the second.
-		if now.Sub(set.lastTried) < j.minRefresh {
-			j.mu.Unlock()
-			return nil, fmt.Errorf("%w: issuer %q, kid %q", ErrUnknownKey, issuer, kid)
-		}
+	// One fetch per issuer at a time. Whoever arrives second waits, then looks
+	// again at what the first one stored, so a rotation resolves for all of
+	// them and a forged kid costs one request rather than one per assertion.
+	st.fetchMu.Lock()
+	defer st.fetchMu.Unlock()
+
+	j.mu.Lock()
+	if k, done, err := j.lookupLocked(st, issuer, kid); done {
+		j.mu.Unlock()
+		return k, err
 	}
-	if set != nil {
-		set.lastTried = now
-	}
+	st.lastTried = j.now()
 	j.mu.Unlock()
 
 	fetched, err := j.fetch(ctx, issuer, src)
@@ -219,22 +246,50 @@ func (j *JWKS) key(ctx context.Context, issuer, kid string) (ed25519.PublicKey, 
 	}
 
 	j.mu.Lock()
-	// A bundle carrying a sequence number that has gone backwards is a replay
-	// of an older document, which is how a revoked key gets reinstated.
-	if set != nil && fetched.sequence != 0 && set.sequence > fetched.sequence {
-		j.mu.Unlock()
+	defer j.mu.Unlock()
+	// A document that sits below the highest sequence seen for this issuer is
+	// a replay of an older one, and an older one can carry a key that has
+	// since been retired. A document declaring no sequence at all is below
+	// every sequence, so stripping the member is refused for the same reason
+	// as lowering it.
+	if st.highestSequence > 0 && fetched.sequence < st.highestSequence {
 		return nil, fmt.Errorf("jose: key document for %q went backwards (sequence %d after %d)",
-			issuer, fetched.sequence, set.sequence)
+			issuer, fetched.sequence, st.highestSequence)
 	}
-	fetched.lastTried = j.now()
-	j.cache[issuer] = fetched
-	k, found := fetched.keys[kid]
-	j.mu.Unlock()
+	if fetched.sequence > st.highestSequence {
+		st.highestSequence = fetched.sequence
+	}
+	st.set = fetched
+	st.lastTried = j.now()
 
+	k, found := fetched.keys[kid]
 	if !found {
 		return nil, fmt.Errorf("%w: issuer %q, kid %q", ErrUnknownKey, issuer, kid)
 	}
 	return k, nil
+}
+
+// lookupLocked answers from the cache where it can. done reports whether the
+// caller has its answer; when it is true, key is the key and err the reason
+// there is not one. JWKS.mu must be held.
+func (j *JWKS) lookupLocked(st *issuerState, issuer, kid string) (key ed25519.PublicKey, done bool, err error) {
+	if st.set == nil {
+		return nil, false, nil
+	}
+	now := j.now()
+	if now.Sub(st.set.fetchedAt) >= j.ttl {
+		return nil, false, nil // stale: fetch again
+	}
+	if k, found := st.set.keys[kid]; found {
+		return k, true, nil
+	}
+	// An unknown kid under a fresh document means either a rotation this
+	// verifier has not seen, or an attacker naming a key that does not exist.
+	// Refetch for the first, rate-limited because of the second.
+	if now.Sub(st.lastTried) < j.minRefresh {
+		return nil, true, fmt.Errorf("%w: issuer %q, kid %q", ErrUnknownKey, issuer, kid)
+	}
+	return nil, false, nil
 }
 
 // jwk is the subset of a JSON Web Key this package can use. Everything else
@@ -289,10 +344,9 @@ func (j *JWKS) fetch(ctx context.Context, issuer, src string) (*keySet, error) {
 	}
 
 	set := &keySet{
-		keys:       map[string]ed25519.PublicKey{},
-		fetchedAt:  j.now(),
-		sequence:   doc.SPIFFESequence,
-		fetchedURL: src,
+		keys:      map[string]ed25519.PublicKey{},
+		fetchedAt: j.now(),
+		sequence:  doc.SPIFFESequence,
 	}
 	// Unusable keys are skipped rather than counted, so a bundle carrying an
 	// RSA key for something else does not change how the Ed25519 ones are

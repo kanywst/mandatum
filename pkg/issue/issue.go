@@ -103,8 +103,10 @@ func Sponsor(signer Signer, sponsor mda.Sponsor, g Grant) (mda.Assertion, error)
 		return mda.Assertion{}, errors.New("issue: sponsor must have an issuer and a subject")
 	}
 	// Without an audience the chain fails V9 at every resource server it is
-	// presented to. Delegate inherits the parent's, so this is the only
-	// place the value can enter a chain.
+	// presented to. Delegate defaults to the parent's where a caller gives
+	// none, and section 6 rule 7 refuses one that differs, so in a chain this
+	// package issues the audience is whatever the sponsor grant named. It is
+	// the rule that makes that true, not the defaulting.
 	if g.Audience == "" {
 		return mda.Assertion{}, errors.New(
 			"issue: a sponsor grant must name an audience; a chain without one is refused by every resource server")

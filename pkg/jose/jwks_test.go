@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -352,5 +353,79 @@ func TestFetchHonoursTheContext(t *testing.T) {
 	defer cancel()
 	if err := j.VerifySignature(ctx, "https://idp.example.org", signed(t, priv, "k1")); err == nil {
 		t.Fatal("ignored a cancelled context")
+	}
+}
+
+// Lowering the sequence is the obvious replay. Stripping the member is the
+// same replay with a different spelling: absent reads as zero, which is below
+// every sequence ever published, so it must be refused too - and must not
+// leave the ratchet at zero for everything that follows.
+func TestADocumentWithNoSequenceCannotFollowOneThatHadIt(t *testing.T) {
+	oldPub, oldPriv, _ := ed25519.GenerateKey(nil)
+	newPub, newPriv, _ := ed25519.GenerateKey(nil)
+
+	bundle := func(seq int, keys map[string]ed25519.PublicKey) string {
+		var raw map[string]any
+		_ = json.Unmarshal([]byte(jwksFor(keys)), &raw)
+		b, _ := json.Marshal(map[string]any{"spiffe_sequence": seq, "keys": raw["keys"]})
+		return string(b)
+	}
+
+	ks := newKeyServer(t, bundle(7, map[string]ed25519.PublicKey{"k2": newPub}))
+	now := time.Unix(1789200000, 0)
+	j := resolverFor(t, ks, "spiffe://example.org",
+		jose.WithCacheTTL(time.Minute),
+		jose.WithClock(func() time.Time { return now }))
+
+	if err := j.VerifySignature(context.Background(), "spiffe://example.org", signed(t, newPriv, "k2")); err != nil {
+		t.Fatal(err)
+	}
+
+	// The retired key comes back in a document that simply omits the member.
+	ks.body.Store(jwksFor(map[string]ed25519.PublicKey{"k1": oldPub, "k2": newPub}))
+	now = now.Add(2 * time.Minute)
+
+	err := j.VerifySignature(context.Background(), "spiffe://example.org", signed(t, oldPriv, "k1"))
+	if err == nil {
+		t.Fatal("accepted a document with no sequence after one that declared 7")
+	}
+	if !strings.Contains(err.Error(), "backwards") {
+		t.Errorf("unhelpful reason: %v", err)
+	}
+
+	// And the floor still holds: a declared-lower document is refused after
+	// the attempt above, rather than the ratchet having been reset to zero.
+	ks.body.Store(bundle(3, map[string]ed25519.PublicKey{"k1": oldPub}))
+	now = now.Add(2 * time.Minute)
+	if err := j.VerifySignature(context.Background(), "spiffe://example.org", signed(t, oldPriv, "k1")); err == nil {
+		t.Fatal("the sequence floor was reset by a document that carried none")
+	}
+}
+
+// A burst of assertions naming a key nobody published must cost one request,
+// not one per assertion: otherwise an attacker points this resolver at the
+// issuer it trusts and uses it as an amplifier.
+func TestConcurrentResolutionsCoalesceIntoOneFetch(t *testing.T) {
+	pub, priv, _ := ed25519.GenerateKey(nil)
+	ks := newKeyServer(t, jwksFor(map[string]ed25519.PublicKey{"k1": pub}))
+	ks.delay = 50 * time.Millisecond
+
+	j := resolverFor(t, ks, "https://idp.example.org", jose.WithCacheTTL(time.Hour))
+
+	assertion := signed(t, priv, "k1")
+	var wg sync.WaitGroup
+	for range 25 {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := j.VerifySignature(context.Background(), "https://idp.example.org", assertion); err != nil {
+				t.Error(err)
+			}
+		}()
+	}
+	wg.Wait()
+
+	if got := ks.hits.Load(); got != 1 {
+		t.Errorf("25 concurrent resolutions caused %d fetches, want 1", got)
 	}
 }
