@@ -140,6 +140,33 @@ for entry in "${PLANNED[@]}"; do
   fi
 done
 
+# A reference to a specification rule that does not exist. This check exists
+# because the audience rule was enforced in code and referenced by the threat
+# model while the specification's section 6 still listed six rules: the
+# document pointed at a rule nobody reading it could find, and every check in
+# this file passed, because the file it pointed at existed.
+SPEC="docs/spec/delegation-assertion.md"
+if [ -f "$SPEC" ]; then
+  # The rules of section 6 are its top-level numbered list. Count it.
+  rules=$(awk '/^## 6\. /{inside=1; next} /^## 6\.[0-9]/{inside=0} /^## 7\. /{inside=0} inside && /^[0-9]+\. /{n=$1; sub(/\./, "", n); if (n+0 > max) max = n+0} END{print max+0}' "$SPEC")
+  if [ "$rules" -eq 0 ]; then
+    echo "::error file=${SPEC}::could not find the numbered rules of section 6"
+    problems=$((problems + 1))
+  else
+    while IFS= read -r file; do
+      while IFS= read -r n; do
+        [ -n "$n" ] || continue
+        checked=$((checked + 1))
+        if [ "$n" -gt "$rules" ] || [ "$n" -lt 1 ]; then
+          echo "::error file=${file}::references section 6 rule $n; section 6 has $rules rules"
+          echo "$file references a section 6 rule that does not exist: rule $n"
+          problems=$((problems + 1))
+        fi
+      done < <(grep -oE '(§6|section 6) rule [0-9]+' "$file" | grep -oE '[0-9]+$')
+    done < <(git ls-files '*.md')
+  fi
+fi
+
 if [ "$problems" -eq 0 ]; then
   echo "$checked document reference(s) resolve, or are declared unwritten."
   exit 0

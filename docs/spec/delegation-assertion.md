@@ -129,7 +129,7 @@ Only `sha-256` is defined. A verifier MUST reject any other prefix rather than a
 | `iss` | yes | The delegator. For depth 0 this is the sponsor's issuing authority. |
 | `sub` | yes | The delegatee. A SPIFFE ID or other stable agent identifier. |
 | `iat` | yes | Issued-at. Rule V4 compares it to the verifier's clock, so an assertion without one is treated as issued in 1970. |
-| `aud` | yes | The resource server this assertion may be presented to. Rule V9 compares it, so a chain whose leaf omits it is refused everywhere. |
+| `aud` | yes | The resource server this assertion may be presented to. It is fixed for the whole chain by §6 rule 7 and compared to the verifier by V9, so a chain whose leaf omits it is refused everywhere and a link that changes it is refused as widening. |
 | `exp` | yes | Expiry. Must not exceed the parent's `exp`. |
 | `jti` | yes | Unique identifier. The unit of revocation. |
 | `mdt.v` | yes | Format version. `1` for this document. |
@@ -160,6 +160,9 @@ For every link *i* > 0, all of the following MUST hold. Together these make the 
 4. `depth(i)` = `depth(i-1) + 1`
 5. `seq(i)` is at least as restrictive as `seq(i-1)`: numeric budgets do not increase, and the constraint set is a superset. `max_invocations` is never negative, and zero means unlimited — so a child may only be zero where its parent was. A verifier MUST treat any non-positive child budget under a positive parent as widening, because a comparison that reads a negative as "smaller" is an escape rather than an attenuation.
 6. `root(i)` is byte-identical to `root(i-1)`.
+7. `aud(i)` = `aud(i-1)`. A chain is issued for one resource server and is evidence at that one only.
+
+Rule 7 is what stops a re-target, and it is not redundant with V9. An agent holding a valid chain can sign a further link naming a *different* resource server: it delegates only what it holds, to a subject of its choosing, with the capabilities unchanged, so rules 1 to 6 all hold. Presented at that other server, V9 compares the leaf's audience to the verifier and passes, because the leaf names it. Every link is valid, every other rule is satisfied, and the sponsor authorized none of it — a confused deputy assembled entirely out of well-formed parts. Without rule 7 the audience binds only whoever issued the leaf, which is the agent under attacker control.
 
 A child that violates any rule is not a valid delegation. There is no "escalation with approval" path in the format; raising authority requires a new chain issued from the sponsor.
 
@@ -359,7 +362,7 @@ Summarized here; the full model is in `docs/security/threat-model.md`.
 | Chain splicing | V1 parent hash commitment; links are not interchangeable. |
 | Privilege escalation via sub-delegation | §6 attenuation, enforced at verify time, not issue time. |
 | Replay after revocation | V8 with fail-closed distribution. |
-| Confused deputy | V2 custody rule plus V9 audience binding. |
+| Confused deputy | V2 custody rule, §6 rule 7 fixing the audience for the whole chain, and V9 comparing it at the verifier. |
 | Attribution stripping | V6 root consistency; `root` cannot be dropped or rewritten. |
 | Log tampering | Merkle inclusion and consistency proofs. |
 | Sequence-state evasion | Fail-closed on state loss; state keyed by chain root, not by PEP. |
