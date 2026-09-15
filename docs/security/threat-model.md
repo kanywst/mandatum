@@ -71,7 +71,9 @@ Residual: revocation is only as fresh as its distribution. A chain revoked one s
 
 ### Confused deputy
 
-A chain issued for one resource server is presented to another, or an agent's broad connectivity substitutes for its caller's narrower authority. Answered by V9 (the leaf names the audience) and V2 (a delegator may only delegate what it holds, so the chain records which principal actually caused the action rather than only which one presented it).
+A chain issued for one resource server is presented to another, or an agent's broad connectivity substitutes for its caller's narrower authority. Answered by §6 rule 7, which fixes the audience for the whole chain, by V9, which compares the leaf's audience to the verifier, and by V2 (a delegator may only delegate what it holds, so the chain records which principal actually caused the action rather than only which one presented it).
+
+V9 alone was not enough, and for a while that is all there was. An agent holding a valid chain could sign a further link naming a different resource server — same capabilities, itself as delegator, so every other rule held — and present it there, where V9 compared the leaf's audience against that server and passed. Rule 7 is what closes it; without it the audience is chosen by whoever issues the leaf, which in this threat is the compromised agent.
 
 ### Sequence evasion
 

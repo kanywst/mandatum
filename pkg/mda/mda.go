@@ -187,6 +187,13 @@ func (m ActionMatcher) MatchesEverything() bool {
 // the parent commitment is a digest over those bytes; re-serializing the
 // claims could produce a different encoding and break the commitment that
 // makes splicing detectable.
+//
+// Claims is a convenience, not an invariant. Nothing stops a caller building
+// an Assertion whose Claims say something the signed Raw does not, so
+// verification does not trust this field: verify.Verify re-derives claims
+// from Raw with ParseClaims and evaluates those. Code outside the verifier
+// that reads Claims from an unverified assertion is reading whatever it was
+// handed.
 type Assertion struct {
 	Raw    []byte
 	Claims Claims

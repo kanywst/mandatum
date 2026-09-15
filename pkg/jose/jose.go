@@ -114,17 +114,24 @@ func Parse(compact []byte) (Header, []byte, error) {
 	return h, payload, nil
 }
 
+// ErrHeader marks a refusal that is about the JOSE header rather than the
+// shape of the serialization: the algorithm, the media type, or a critical
+// extension. A caller mapping errors onto the specification's rules needs the
+// distinction, because those three are what rule V3 refuses and everything
+// else Parse rejects is a structural fault under V1.
+var ErrHeader = errors.New("jose: header")
+
 func (h Header) check() error {
 	if h.Algorithm != Algorithm {
 		// Named explicitly so an operator debugging an integration sees what
 		// was offered, and so "none" produces a message rather than silence.
-		return fmt.Errorf("jose: alg %q is not supported; only %q is accepted", h.Algorithm, Algorithm)
+		return fmt.Errorf("%w: alg %q is not supported; only %q is accepted", ErrHeader, h.Algorithm, Algorithm)
 	}
 	if h.Type != Type {
-		return fmt.Errorf("jose: typ %q is not a delegation assertion; want %q", h.Type, Type)
+		return fmt.Errorf("%w: typ %q is not a delegation assertion; want %q", ErrHeader, h.Type, Type)
 	}
 	if len(h.Critical) > 0 {
-		return fmt.Errorf("jose: crit requests extensions this verifier does not implement: %v", h.Critical)
+		return fmt.Errorf("%w: crit requests extensions this verifier does not implement: %v", ErrHeader, h.Critical)
 	}
 	return nil
 }

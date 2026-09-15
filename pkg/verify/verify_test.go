@@ -1,13 +1,15 @@
 package verify
 
 import (
+	"bytes"
 	"context"
+	"crypto/ed25519"
 	"errors"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/kanywst/mandatum/pkg/jose"
 	"github.com/kanywst/mandatum/pkg/mda"
 )
 
@@ -62,10 +64,18 @@ type builder struct {
 func chainOf(links ...mda.Claims) *builder { return &builder{links: links} }
 
 // build serializes each link and fixes up parent commitments and depths.
-// Serialization here stands in for a JOSE compact form; verification treats
-// Raw as opaque bytes, so a stable stand-in is sufficient and keeps these
-// tests independent of a signing implementation.
+//
+// The serialization is a real JOSE compact form, because Verify re-derives
+// claims from those bytes rather than trusting the Claims field. The key is
+// fixed and the signature is never checked here — these tests use a stub
+// SignatureVerifier — but the bytes have to parse and have to say what the
+// test means them to say.
 func (b *builder) build() mda.Chain {
+	_, key, err := ed25519.GenerateKey(bytes.NewReader(make([]byte, 64)))
+	if err != nil {
+		panic(err)
+	}
+
 	chain := make(mda.Chain, len(b.links))
 	var prevRaw []byte
 	for i, c := range b.links {
@@ -75,11 +85,36 @@ func (b *builder) build() mda.Chain {
 		} else {
 			c.Mandatum.Parent = mda.Digest(prevRaw)
 		}
-		raw := fmt.Appendf(nil, "link-%d.%s.%s.%s", i, c.Issuer, c.Subject, c.ID)
+		raw, err := jose.Sign(c, key, "test")
+		if err != nil {
+			panic(err)
+		}
 		chain[i] = mda.Assertion{Raw: raw, Claims: c}
 		prevRaw = raw
 	}
 	return chain
+}
+
+// reseal re-serializes link i after a test has edited its claims.
+//
+// Verify derives claims from the bytes, so editing Claims alone changes
+// nothing: a test that wants a link to say something different has to make it
+// say so on the wire. Only the last link may be resealed, because every link
+// below one commits to its bytes.
+func reseal(c mda.Chain, i int) mda.Chain {
+	if i != len(c)-1 {
+		panic("reseal: resealing a non-leaf link would break the parent commitment below it")
+	}
+	_, key, err := ed25519.GenerateKey(bytes.NewReader(make([]byte, 64)))
+	if err != nil {
+		panic(err)
+	}
+	raw, err := jose.Sign(c[i].Claims, key, "test")
+	if err != nil {
+		panic(err)
+	}
+	c[i].Raw = raw
+	return c
 }
 
 func sponsor() mda.Sponsor {
@@ -217,7 +252,7 @@ func TestVerifyRejects(t *testing.T) {
 			chain: func() mda.Chain {
 				c := twoHop()
 				c[1].Claims.Mandatum.Parent = mda.Digest([]byte("some other assertion"))
-				return c
+				return reseal(c, 1)
 			},
 			wantRule: "V1",
 			wantText: "was not issued against this chain",
@@ -240,7 +275,7 @@ func TestVerifyRejects(t *testing.T) {
 				// stops exercising the chain-sequence rule.
 				c[1].Claims.Mandatum.Depth = 5
 				c[1].Claims.Mandatum.MaxDepth = 9
-				return c
+				return reseal(c, 1)
 			},
 			wantRule: "V1",
 			wantText: "does not follow",
@@ -250,7 +285,7 @@ func TestVerifyRejects(t *testing.T) {
 			chain: func() mda.Chain {
 				c := twoHop()
 				c[1].Claims.Issuer = "agent-z"
-				return c
+				return reseal(c, 1)
 			},
 			wantRule: "V2",
 			wantText: "the parent delegated to",
@@ -267,7 +302,7 @@ func TestVerifyRejects(t *testing.T) {
 			chain: func() mda.Chain {
 				c := twoHop()
 				c[1].Claims.ExpiresAt = testNow.Unix() - 3600
-				return c
+				return reseal(c, 1)
 			},
 			wantRule: "V4",
 			wantText: "expired",
@@ -277,7 +312,7 @@ func TestVerifyRejects(t *testing.T) {
 			chain: func() mda.Chain {
 				c := twoHop()
 				c[1].Claims.IssuedAt = testNow.Unix() + 3600
-				return c
+				return reseal(c, 1)
 			},
 			wantRule: "V4",
 			wantText: "in the future",
@@ -287,7 +322,7 @@ func TestVerifyRejects(t *testing.T) {
 			chain: func() mda.Chain {
 				c := twoHop()
 				c[1].Claims.ExpiresAt = c[0].Claims.ExpiresAt + 1
-				return c
+				return reseal(c, 1)
 			},
 			wantRule: "V5",
 			wantText: "outlives its parent",
@@ -297,7 +332,7 @@ func TestVerifyRejects(t *testing.T) {
 			chain: func() mda.Chain {
 				c := twoHop()
 				c[1].Claims.Mandatum.MaxDepth = c[0].Claims.Mandatum.MaxDepth
-				return c
+				return reseal(c, 1)
 			},
 			wantRule: "V5",
 			wantText: "does not decrease",
@@ -340,7 +375,7 @@ func TestVerifyRejects(t *testing.T) {
 			chain: func() mda.Chain {
 				c := twoHop()
 				c[1].Claims.Mandatum.Root.Subject = "someone-else"
-				return c
+				return reseal(c, 1)
 			},
 			wantRule: "V6",
 			wantText: "the chain is rooted in",
@@ -350,7 +385,7 @@ func TestVerifyRejects(t *testing.T) {
 			chain: func() mda.Chain {
 				c := twoHop()
 				c[1].Claims.Mandatum.Root.AuthenticatedAt = 1
-				return c
+				return reseal(c, 1)
 			},
 			wantRule: "V6",
 			wantText: "authentication time differs",
@@ -388,11 +423,14 @@ func TestVerifyRejects(t *testing.T) {
 			wantText: "unanswerable check denies",
 		},
 		{
-			name: "leaf addressed to another resource server",
+			// V5 rule 7 stops a link changing the audience mid-chain, so the
+			// case V9 is left holding is a whole chain issued for somebody
+			// else and presented here.
+			name: "chain addressed to another resource server",
 			chain: func() mda.Chain {
-				c := twoHop()
-				c[1].Claims.Audience = "https://other.example.org"
-				return c
+				elsewhere := link(sponsorIss, "agent-a", 3, capability("mcp_tool", "search.query", "invoke"))
+				elsewhere.Audience = "https://other.example.org"
+				return chainOf(elsewhere).build()
 			},
 			wantRule: "V9",
 			wantText: "addressed to",

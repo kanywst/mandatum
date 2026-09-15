@@ -103,8 +103,10 @@ func Sponsor(signer Signer, sponsor mda.Sponsor, g Grant) (mda.Assertion, error)
 		return mda.Assertion{}, errors.New("issue: sponsor must have an issuer and a subject")
 	}
 	// Without an audience the chain fails V9 at every resource server it is
-	// presented to. Delegate inherits the parent's, so this is the only
-	// place the value can enter a chain.
+	// presented to. Delegate defaults to the parent's where a caller gives
+	// none, and section 6 rule 7 refuses one that differs, so in a chain this
+	// package issues the audience is whatever the sponsor grant named. It is
+	// the rule that makes that true, not the defaulting.
 	if g.Audience == "" {
 		return mda.Assertion{}, errors.New(
 			"issue: a sponsor grant must name an audience; a chain without one is refused by every resource server")
@@ -241,19 +243,12 @@ func sign(claims mda.Claims, signer Signer) (mda.Assertion, error) {
 // in order, sponsor first.
 //
 // The claims it returns are unverified. Pass the result to verify.Verify
-// before relying on anything in it.
+// before relying on anything in it; the verifier re-derives claims from the
+// bytes rather than trusting what it is handed, so this is a convenience
+// rather than a step that establishes anything.
+//
+// Deprecated: use mda.ParseChain. This forwards to it and will be removed
+// before v1.0.
 func ParseChain(serializations [][]byte) (mda.Chain, error) {
-	chain := make(mda.Chain, 0, len(serializations))
-	for i, raw := range serializations {
-		_, payload, err := jose.Parse(raw)
-		if err != nil {
-			return nil, fmt.Errorf("issue: link %d: %w", i, err)
-		}
-		var claims mda.Claims
-		if err := unmarshalStrict(payload, &claims); err != nil {
-			return nil, fmt.Errorf("issue: link %d: %w", i, err)
-		}
-		chain = append(chain, mda.Assertion{Raw: raw, Claims: claims})
-	}
-	return chain, nil
+	return mda.ParseChain(serializations)
 }

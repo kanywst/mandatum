@@ -163,9 +163,10 @@ func New(endpoint string, opts ...Option) (*Client, error) {
 
 // Evaluate asks the PDP about one access request.
 //
-// A non-nil error always accompanies a denying Decision. Callers should treat
-// the Decision as authoritative and the error as the explanation, so that
-// forgetting to check one of the two still denies.
+// Every error path returns Deny, so a caller who checks only the Decision
+// still denies. The converse does not hold: a PDP that answers with a valid
+// "no" returns Deny and a nil error, so a caller who checks only the error
+// allows everything the PDP refused. Check the Decision.
 func (c *Client) Evaluate(ctx context.Context, r Request) (Decision, error) {
 	if err := r.validate(); err != nil {
 		return Deny, err

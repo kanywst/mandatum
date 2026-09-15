@@ -25,9 +25,10 @@ func checkAttenuation(chain mda.Chain) error {
 	return nil
 }
 
-// Attenuates reports whether child is no wider than parent, for the four
+// Attenuates reports whether child is no wider than parent, for the five
 // rules of specification section 6 that compare a pair of links on their own:
-// capability entailment, expiry, the depth budget, and sequence constraints.
+// capability entailment, expiry, the depth budget, sequence constraints, and
+// the audience.
 //
 // It does not cover rule 4, that depth increments by one, or rule 6, that the
 // sponsor is byte-identical. Those are properties of a link's position in a
@@ -45,6 +46,19 @@ func checkAttenuation(chain mda.Chain) error {
 // A nil return means every rule holds. The error names the rule that failed
 // in terms a delegator can act on.
 func Attenuates(parent, child mda.Claims) error {
+	// Rule 7. The audience is fixed at the root: a chain is issued for one
+	// resource server and is evidence at that one only. Without this, an
+	// agent holding a chain for one server mints itself a leaf naming
+	// another and presents it there. Every other rule passes - it delegates
+	// only what it holds, to itself, with the same capabilities - and V9 at
+	// the target compares the leaf's audience against itself, so it passes
+	// too. That is the confused deputy this format exists to prevent,
+	// assembled entirely out of valid links.
+	if child.Audience != parent.Audience {
+		return fmt.Errorf("names audience %q, and the parent names %q; a chain is issued for one resource server",
+			child.Audience, parent.Audience)
+	}
+
 	if child.ExpiresAt > parent.ExpiresAt {
 		return fmt.Errorf("outlives its parent (exp %d > %d)", child.ExpiresAt, parent.ExpiresAt)
 	}
