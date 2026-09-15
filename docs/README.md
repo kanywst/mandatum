@@ -19,6 +19,6 @@ The specification references these documents. They are not written yet, and are 
 | Document | Contents | Due |
 | --- | --- | --- |
 | `spec/sequence-store.md` | What a replicated sequence store must guarantee for fail-closed behaviour to hold. The interface itself is `sequence.Store`; this is the prose a second implementation would need. | v0.3 |
-| `compliance/eu-ai-act.md` | How the audit trail maps to the high-risk logging and traceability obligations applicable since 2026-08-02. Written by engineers, not lawyers, and says so. | v0.3 |
+| `compliance/eu-ai-act.md` | How the audit trail maps to the EU AI Act's Article 12 record-keeping and traceability obligations, which apply to Annex III systems from 2027-12-02 and Annex I ones from 2028-08-02. Written by engineers, not lawyers, and says so. | v0.3 |
 
 If you need one of these sooner than its release, say so in an issue. Ordering is a guess about what matters and is easy to change.
