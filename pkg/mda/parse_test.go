@@ -145,7 +145,7 @@ func TestParseChainReportsWhichLinkFailed(t *testing.T) {
 
 	_, err = mda.ParseChain([][]byte{good, []byte("nonsense")})
 	if err == nil {
-		t.Fatal("accepted a chain with an unparseable link")
+		t.Fatal("accepted a chain with an unparsable link")
 	}
 	if !strings.Contains(err.Error(), "link 1") {
 		t.Errorf("error does not say which link failed: %v", err)
