@@ -1,6 +1,8 @@
 # Roadmap
 
-Last updated: 2026-09-13.
+Last reconciled with the implementation: 2026-09-16.
+
+That date is a claim about when every Status below was last checked against the code, which is the thing a reader needs and the thing that can go stale silently. It is not a record of when this file was last edited: `git log ROADMAP.md` already holds that, and the line this replaces tried to be both — it said 2026-09-13 through two later commits that changed the gates it sits above.
 
 This roadmap has two tracks that run at the same time. The engineering track is the one that produces software. The community track is the one that decides whether the project survives, and it is listed first because it is the harder of the two and the one most likely to be neglected.
 
