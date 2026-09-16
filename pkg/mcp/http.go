@@ -187,6 +187,13 @@ func parseToolCall(params json.RawMessage) (Call, error) {
 // handlers quote a value containing one; a deployment's handler is not
 // obliged to, and this has to hold for whichever one is installed.
 //
+// What counts as a line break is decided by whatever reads the log rather
+// than here, so this handles the categories and not the two obvious bytes:
+// U+2028 and U+2029 are `Zl` and `Zp`, not control characters, and every
+// JavaScript-based log viewer breaks a line on them. Format characters go
+// too, because a bidi override reorders a line an operator is reading
+// without changing a byte of what it says.
+//
 // Bounded as well as flattened: an error carrying a megabyte of echoed input
 // is a log nobody reads and a disk somebody fills.
 func loggable(err error) string {
@@ -196,9 +203,9 @@ func loggable(err error) string {
 
 	flattened := strings.Map(func(r rune) rune {
 		switch {
-		case r == '\n' || r == '\r' || r == '\t':
+		case r == '\n' || r == '\r' || r == '\t', unicode.In(r, unicode.Zl, unicode.Zp):
 			return ' '
-		case unicode.IsControl(r):
+		case unicode.In(r, unicode.Cc, unicode.Cf):
 			return -1
 		default:
 			return r

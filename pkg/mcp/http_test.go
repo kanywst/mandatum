@@ -2,8 +2,10 @@ package mcp_test
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
@@ -201,10 +203,75 @@ func TestMiddlewareRefusesWhatItCannotRead(t *testing.T) {
 	}
 }
 
+// rawHandler writes attribute values exactly as it is given them.
+//
+// `slog`'s own handlers quote a value containing a line break, so a test
+// using one would be testing strconv.Quote. The contract is that the reason
+// is safe before it reaches a handler, including the handler a deployment
+// wrote itself, and this is that handler.
+type rawHandler struct{ out *bytes.Buffer }
+
+func (h *rawHandler) Enabled(context.Context, slog.Level) bool { return true }
+
+func (h *rawHandler) Handle(_ context.Context, r slog.Record) error {
+	fmt.Fprintf(h.out, "%s %s", r.Level, r.Message)
+	r.Attrs(func(a slog.Attr) bool {
+		fmt.Fprintf(h.out, " %s=%s", a.Key, a.Value)
+		return true
+	})
+	fmt.Fprintln(h.out)
+	return nil
+}
+
+func (h *rawHandler) WithAttrs([]slog.Attr) slog.Handler { return h }
+
+func (h *rawHandler) WithGroup(string) slog.Handler { return h }
+
 // A denial reason quotes the request back, so it is attacker-influenced text
 // heading for a log an operator reads to decide whether they are under
 // attack. A newline in it would be a second log line the attacker wrote.
 func TestARefusalReasonCannotSplitTheLogLine(t *testing.T) {
+	for _, tc := range []struct{ name, forged string }{
+		{"a newline", "search\nWARN mcp: tool call allowed"},
+		{"a carriage return", "search\rWARN mcp: tool call allowed"},
+		// Zl and Zp, not Cc: unicode.IsControl says no, and every
+		// JavaScript-based log viewer breaks a line on them.
+		{"a line separator", "search\u2028WARN mcp: tool call allowed"},
+		{"a paragraph separator", "search\u2029WARN mcp: tool call allowed"},
+	} {
+		t.Run(tc.name, func(t *testing.T) { assertOneLogLine(t, tc.forged) })
+	}
+}
+
+// A bidi override reorders what an operator reads without changing what the
+// line says, so it does not reach the log either.
+func TestARefusalReasonCannotReorderItself(t *testing.T) {
+	logged := refusalLog(t, "search\u202Eallowed")
+	if strings.ContainsRune(logged, '\u202E') {
+		t.Errorf("a right-to-left override survived into the log:\n%s", logged)
+	}
+}
+
+func assertOneLogLine(t *testing.T, forgedToolName string) {
+	t.Helper()
+	written := refusalLog(t, forgedToolName)
+
+	// Every rune something downstream will break a line on, not just the
+	// one this handler happens to write records with.
+	for _, br := range []rune{'\n', '\r', '\u0085', '\u2028', '\u2029'} {
+		if strings.ContainsRune(written, br) {
+			t.Errorf("%U survived into the log, and whatever reads it will break a line there:\n%q", br, written)
+		}
+	}
+	// Flattened rather than dropped: the operator still sees what was
+	// attempted, as one field of one line, which is what it always was.
+	if !strings.Contains(written, "stage=catalog") {
+		t.Errorf("the refusal did not record its stage:\n%s", written)
+	}
+}
+
+func refusalLog(t *testing.T, forgedToolName string) string {
+	t.Helper()
 	w := newWorld(t)
 	evaluator, err := sequence.NewEvaluator(sequence.NewMemoryStore())
 	if err != nil {
@@ -218,22 +285,14 @@ func TestARefusalReasonCannotSplitTheLogLine(t *testing.T) {
 
 	var log bytes.Buffer
 	e, err := mcp.New(w.verifier(), forged, &pdp{allow: true}, evaluator,
-		mcp.WithLogger(slog.New(slog.NewTextHandler(&log, nil))))
+		mcp.WithLogger(slog.New(&rawHandler{out: &log})))
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	post(e.Middleware(&spy{}), toolCall("search\nWARN mcp: tool call allowed", w.chain(nil)))
+	post(e.Middleware(&spy{}), toolCall(forgedToolName, w.chain(nil)))
 
-	written := strings.TrimRight(log.String(), "\n")
-	if lines := strings.Count(written, "\n"); lines != 0 {
-		t.Errorf("one refusal wrote %d extra log lines:\n%s", lines, written)
-	}
-	// Flattened rather than dropped: the operator still sees what was
-	// attempted, as one field of one line, which is what it always was.
-	if !strings.Contains(written, "stage=catalog") {
-		t.Errorf("the refusal did not record its stage:\n%s", written)
-	}
+	return strings.TrimRight(log.String(), "\n")
 }
 
 func TestMiddlewareRefusesABodyOverTheLimit(t *testing.T) {
