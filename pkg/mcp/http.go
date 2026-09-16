@@ -8,6 +8,8 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
+	"unicode"
 
 	"github.com/kanywst/mandatum/pkg/mda"
 )
@@ -176,6 +178,40 @@ func parseToolCall(params json.RawMessage) (Call, error) {
 	return Call{Chain: chain, Tool: p.Name, Arguments: p.Arguments}, nil
 }
 
+// loggable flattens a denial reason into one log field.
+//
+// A reason quotes the request back at the operator — a tool name, a parse
+// error naming what it choked on — so it is attacker-influenced text on its
+// way into a log somebody reads to decide whether they are under attack. A
+// newline in it is a second log line the attacker wrote. `slog`'s own
+// handlers quote a value containing one; a deployment's handler is not
+// obliged to, and this has to hold for whichever one is installed.
+//
+// Bounded as well as flattened: an error carrying a megabyte of echoed input
+// is a log nobody reads and a disk somebody fills.
+func loggable(err error) string {
+	if err == nil {
+		return ""
+	}
+
+	flattened := strings.Map(func(r rune) rune {
+		switch {
+		case r == '\n' || r == '\r' || r == '\t':
+			return ' '
+		case unicode.IsControl(r):
+			return -1
+		default:
+			return r
+		}
+	}, err.Error())
+
+	const limit = 512
+	if runes := []rune(flattened); len(runes) > limit {
+		return string(runes[:limit]) + "…"
+	}
+	return flattened
+}
+
 // forward hands the request on with its body intact. The body was consumed
 // to read the envelope, so it is replaced rather than reused; a handler
 // reading an already-drained body would see an empty request.
@@ -196,7 +232,7 @@ func (e *Enforcer) refuse(w http.ResponseWriter, id json.RawMessage, stage Stage
 	if log == nil {
 		log = slog.Default()
 	}
-	log.Warn("mcp: tool call refused", "stage", string(stage), "reason", cause)
+	log.Warn("mcp: tool call refused", "stage", string(stage), "reason", loggable(cause))
 
 	response := struct {
 		JSONRPC string          `json:"jsonrpc"`

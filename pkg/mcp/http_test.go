@@ -1,7 +1,9 @@
 package mcp_test
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -196,6 +198,41 @@ func TestMiddlewareRefusesWhatItCannotRead(t *testing.T) {
 				t.Error("a request the middleware could not read was forwarded anyway")
 			}
 		})
+	}
+}
+
+// A denial reason quotes the request back, so it is attacker-influenced text
+// heading for a log an operator reads to decide whether they are under
+// attack. A newline in it would be a second log line the attacker wrote.
+func TestARefusalReasonCannotSplitTheLogLine(t *testing.T) {
+	w := newWorld(t)
+	evaluator, err := sequence.NewEvaluator(sequence.NewMemoryStore())
+	if err != nil {
+		t.Fatal(err)
+	}
+	// A catalog whose error carries what the caller sent, newlines included.
+	// This is the shape of any error that quotes its input back.
+	forged := mcp.CatalogFunc(func(tool string, _ map[string]any) (mcp.Facts, error) {
+		return mcp.Facts{}, errors.New("unknown tool " + tool)
+	})
+
+	var log bytes.Buffer
+	e, err := mcp.New(w.verifier(), forged, &pdp{allow: true}, evaluator,
+		mcp.WithLogger(slog.New(slog.NewTextHandler(&log, nil))))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	post(e.Middleware(&spy{}), toolCall("search\nWARN mcp: tool call allowed", w.chain(nil)))
+
+	written := strings.TrimRight(log.String(), "\n")
+	if lines := strings.Count(written, "\n"); lines != 0 {
+		t.Errorf("one refusal wrote %d extra log lines:\n%s", lines, written)
+	}
+	// Flattened rather than dropped: the operator still sees what was
+	// attempted, as one field of one line, which is what it always was.
+	if !strings.Contains(written, "stage=catalog") {
+		t.Errorf("the refusal did not record its stage:\n%s", written)
 	}
 }
 
