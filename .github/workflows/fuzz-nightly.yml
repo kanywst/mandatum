@@ -56,23 +56,38 @@ jobs:
         # is that derivation, one package per matrix job so a long campaign
         # is parallel rather than serialised into the six-hour job limit.
         run: |
-          packages=$(go list ./... | while read -r pkg; do
-            if go test -list 'Fuzz.*' "$pkg" 2>/dev/null | grep -q '^Fuzz'; then
-              echo "$pkg"
+          set -euo pipefail
+
+          packages=()
+          while IFS= read -r pkg; do
+            # A listing that fails and a listing that finds nothing are not the
+            # same answer. `go test -list` fails when a package's test files do
+            # not compile, and discarding that would drop the package from the
+            # matrix and leave the run green — the silent no-fuzz this change
+            # exists to stop, arriving from the other side. So it is an error,
+            # and stderr is kept.
+            if ! listing=$(go test -list 'Fuzz.*' "$pkg" 2>&1); then
+              echo "::error::listing fuzz targets in ${pkg} failed; the campaign cannot know what it is skipping"
+              echo "$listing"
+              exit 1
             fi
-          done | jq -Rsc 'split("\n") | map(select(length > 0))')
+            if grep -q '^Fuzz' <<<"$listing"; then
+              packages+=("$pkg")
+            fi
+          done < <(go list ./...)
 
           # An empty matrix is zero jobs, and zero jobs is a green workflow
-          # that fuzzed nothing — the failure this whole change is about,
-          # arriving by a different route. Refuse it.
-          if [ "$packages" = '[]' ]; then
-            echo "no package in this module declares a Fuzz target."
+          # that fuzzed nothing. Refuse that too.
+          if [ ${#packages[@]} -eq 0 ]; then
+            echo "::error::no package in this module declares a Fuzz target"
             echo "A nightly campaign with nothing to fuzz is a green run that proves nothing."
             exit 1
           fi
 
-          echo "$packages" | jq -r '.[]' | sed 's/^/fuzzing: /'
-          echo "packages=$packages" >> "$GITHUB_OUTPUT"
+          printf 'fuzzing: %s\n' "${packages[@]}"
+          printf '%s\n' "${packages[@]}" |
+            jq -Rsc 'split("\n") | map(select(length > 0))' |
+            { read -r packages; echo "packages=$packages" >> "$GITHUB_OUTPUT"; }
 
   fuzz:
     name: fuzz ${{ matrix.package }}
