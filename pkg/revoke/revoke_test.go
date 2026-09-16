@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -96,12 +98,50 @@ func TestParseSetRefusesWhatItCannotTrust(t *testing.T) {
 		"no bits":           `{"v":1,"sequence":1,"generated_at":1789200000,"hashes":7,"bits":""}`,
 		"bits are not b64":  `{"v":1,"sequence":1,"generated_at":1789200000,"hashes":7,"bits":"!!!!"}`,
 		"negative hash cnt": `{"v":1,"sequence":1,"generated_at":1789200000,"hashes":-1,"bits":"AAAA"}`,
+		"hash cnt over max": `{"v":1,"sequence":1,"generated_at":1789200000,"hashes":65,"bits":"AAAA"}`,
+		// The shape a fuzz campaign found: eighty bytes that cost seconds of
+		// CPU and tens of gigabytes per lookup, on the path of every
+		// authorized action.
+		"hash cnt in the billions": `{"v":1,"sequence":1,"generated_at":1789200000,"hashes":1789200001,"bits":"P_g"}`,
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := revoke.ParseSet([]byte(raw)); err == nil {
 				t.Fatal("accepted a set that should have been refused")
 			}
 		})
+	}
+}
+
+// A set is fetched from wherever a deployment distributes it, and a lookup
+// costs one hash position per declared hash function. Left unbounded, the
+// document saying which agents are revoked is also a way to stop the
+// enforcement point answering at all: the input below took three seconds per
+// MayContain and asked for fourteen gigabytes before this bound existed.
+func TestALookupCannotBeMadeArbitrarilyExpensive(t *testing.T) {
+	raw := fmt.Appendf(nil,
+		`{"v":1,"sequence":1,"generated_at":1789200000,"hashes":%d,"bits":"P_g"}`, math.MaxInt32)
+
+	start := time.Now()
+	s, err := revoke.ParseSet(raw)
+	if err == nil {
+		s.MayContain("01JB2XA4M0RN5S8Q2K7T3W1Y9D")
+		t.Fatal("accepted a set whose lookups cost whatever the publisher wrote")
+	}
+	if elapsed := time.Since(start); elapsed > time.Second {
+		t.Errorf("refusing took %s; the refusal has to be cheaper than the attack", elapsed)
+	}
+	if !strings.Contains(err.Error(), strconv.Itoa(revoke.MaxHashes)) {
+		t.Errorf("the refusal does not name the bound it applied: %v", err)
+	}
+}
+
+func TestNewSetRefusesARateItCannotBuild(t *testing.T) {
+	// Optimal sizing puts k at -log2(p), so a rate this small needs more
+	// hash functions than a set may declare. Refused rather than clamped:
+	// a publisher who believes they got 1e-30 and got 1e-19 is worse off
+	// than one who got an error.
+	if _, err := revoke.NewSet([]string{"a"}, 1e-30, 1, built); err == nil {
+		t.Error("built a set at a rate that needs more hash functions than the wire format allows")
 	}
 }
 

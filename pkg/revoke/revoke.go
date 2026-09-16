@@ -30,6 +30,20 @@ import (
 // Version is the wire format version of an encoded set.
 const Version = 1
 
+// MaxHashes bounds `hashes` in a published set.
+//
+// The cost of a lookup is k hash positions, and a lookup happens on the path
+// of every authorized action. Without a bound, k is whatever the publisher
+// wrote: a set of eighty bytes declaring a k in the billions makes one
+// MayContain take seconds and ask for tens of gigabytes, so the document that
+// says which agents are revoked doubles as a way to stop the enforcement
+// point evaluating anything at all.
+//
+// Sixty-four is past any operational need rather than a tuned figure. At
+// optimal sizing k = -log2(p), so k = 64 is a false-positive rate around
+// 10^-19, and a realistic set wanting one in a billion uses k = 30.
+const MaxHashes = 64
+
 // wireVersion is what an encoder writes and a decoder requires. A verifier
 // that silently accepted a future version would be guessing at semantics it
 // does not have.
@@ -77,6 +91,15 @@ func NewSet(revoked []string, falsePositiveRate float64, sequence uint64, genera
 	m := int(math.Ceil(-float64(n) * math.Log(falsePositiveRate) / (math.Ln2 * math.Ln2)))
 	m = max(((m+7)/8)*8, 8) // whole bytes, so the wire form has no spare bits
 	k := max(int(math.Round(float64(m)/float64(n)*math.Ln2)), 1)
+	if k > MaxHashes {
+		// Refused rather than clamped. Clamping would build a filter whose
+		// false-positive rate is not the one the caller asked for, and say
+		// nothing about it; a rate a publisher believes is wrong is worse
+		// than a rate they could not have.
+		return nil, fmt.Errorf(
+			"revoke: a false-positive rate of %v needs %d hash functions, above the %d a set may declare",
+			falsePositiveRate, k, MaxHashes)
+	}
 
 	s := &Set{
 		bits:        make([]byte, m/8),
@@ -158,8 +181,10 @@ func ParseSet(raw []byte) (*Set, error) {
 	if w.Version != Version {
 		return nil, fmt.Errorf("revoke: set is version %d, this implementation reads %d", w.Version, Version)
 	}
-	if w.Hashes < 1 {
-		return nil, fmt.Errorf("revoke: set declares %d hash functions", w.Hashes)
+	if w.Hashes < 1 || w.Hashes > MaxHashes {
+		return nil, fmt.Errorf(
+			"revoke: set declares %d hash functions, outside 1..%d; a lookup costs one hash position each and runs before every authorized action",
+			w.Hashes, MaxHashes)
 	}
 	if w.GeneratedAt <= 0 {
 		return nil, errors.New("revoke: set does not say when it was generated")
