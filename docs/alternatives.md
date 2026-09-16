@@ -1,6 +1,6 @@
 # Alternatives
 
-Last updated: 2026-09-13.
+Last checked against the projects and drafts it covers: 2026-09-14. The date is a claim about when each entry was read against its source, not about when this file was last edited — an entry can be wrong without this file changing, which is the failure this document exists to avoid.
 
 This document exists to answer one question honestly: **does something already solve this, and should Mandatum exist?**
 

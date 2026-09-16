@@ -1,6 +1,6 @@
 # Threat model
 
-Last updated: 2026-09-13. Covers the Delegation Assertion format, the verifier, the signing layer, the AuthZEN binding and sequence evaluation, at the state described in [CHANGELOG.md](../../CHANGELOG.md).
+Last reconciled with the implementation: 2026-09-16. That is when what follows was last checked against the code, which is the claim a reader needs from a threat model and the one that goes stale without anything looking wrong; `git log` holds the edit history. Covers the Delegation Assertion format, the verifier, the signing layer, the AuthZEN binding, sequence evaluation and the MCP enforcement point, at the state described in [CHANGELOG.md](../../CHANGELOG.md).
 
 The specification carries a summary table in section 11. This is the full version: what is being defended, from whom, what is assumed rather than enforced, and what is knowingly not covered.
 
