@@ -1,6 +1,6 @@
 # COAZ-MCP conformance
 
-Last updated: 2026-09-13. Against the AuthZEN COAZ-MCP Binding 1.0 Working Group Draft, June 2026.
+Last checked against the AuthZEN COAZ-MCP Binding 1.0 Working Group Draft (June 2026): 2026-09-13. That date is when the mapping was last read against the draft, which is the claim worth dating; it is not when this file was last edited, and `git log` has that.
 
 [The specification](delegation-assertion.md) §8 says Mandatum follows the COAZ-MCP binding rather than defining a parallel mapping. This is where that claim is made checkable: what is implemented, what is not, and the one place the output goes beyond what the binding defines.
 
@@ -26,7 +26,9 @@ Arguments and the server identifier go in `resource.properties`. The binding doe
 ## What is not implemented
 
 - **Only `tools/call`.** The binding gives default mappings for `tools/list`, `resources/list`, `resources/read`, `resources/subscribe`, `resources/unsubscribe`, `prompts/list`, `prompts/get`, `completion/complete`, `logging/setLevel`, and the four `tasks/*` methods as well. None of those are mapped.
-- **Neither of the binding's two catch-all behaviours.** `ping` and `notifications/*` are pass-through: "the PEP MUST NOT call the PDP for them and MUST allow them to proceed". A method with neither a default nor a declared mapping "MUST be denied". Both are normative PEP requirements rather than mappings, and a PEP built on this library has to implement them itself, fail-closed included. Server-initiated requests need nothing: the binding puts them out of scope for this version.
+- **Neither of the binding's two catch-all behaviours.** `ping` and `notifications/*` are pass-through: "the PEP MUST NOT call the PDP for them and MUST allow them to proceed". A method with neither a default nor a declared mapping "MUST be denied". Both are normative PEP requirements rather than mappings, and a PEP built on this library has to implement them itself, fail-closed included.
+
+  `pkg/mcp.Enforcer.Middleware` is now such a PEP, and it does not implement them: it enforces `tools/call` and forwards every other method to the server behind it. That is deliberate and it is a divergence, not an oversight — a delegation chain says nothing about `tools/list`, and this middleware is a per-call layer above MCP's own transport authorization rather than a replacement for it. A deployment that needs the binding's deny-by-default over unmapped methods has to add it, and should not read "Mandatum follows the COAZ-MCP binding" as saying it is already there. Server-initiated requests need nothing: the binding puts them out of scope for this version.
 - **No declared mappings.** The binding lets a tool declare an `x-authzen-mapping` in its `inputSchema`, with CEL expressions over `params` and `token`. Mandatum reads neither, so a tool that declares a mapping is authorized by the default mapping instead. This is a real gap for parameter-level policy, and it is the next thing to build here.
 - **No CEL.** Follows from the above.
 - **No Access Evaluations batching.** Single evaluation only; the binding's multi-evaluation examples are not supported.
@@ -41,7 +43,9 @@ Whether the binding should define a place for it is open, and being discussed in
 
 ## Divergences
 
-One, and it is ours rather than the binding's.
+Both are ours rather than the binding's.
+
+The `_meta` key a chain travels in, specification §8.1, is defined by this project. The binding maps an MCP request onto an evaluation request; it says nothing about how a delegation chain reaches the PEP, because it has no delegation chain. The key sits under a reverse-DNS prefix MCP's own rules mark as third-party, so nothing here occupies a name either specification might later want.
 
 `resource.properties` and `subject.properties` in the emitted request are not part of the default `tools/call` mapping, which is a fixed object with neither. The binding's own mechanism for projecting arguments into a request is a declared mapping, and the section on omitted inputs is explicit that a decision covers only the request the selected mapping constructed. Sending more than the mapping defines does not break a PDP that ignores unknown members, but it is a wider request than the binding specifies, and a policy written against these fields would not port to a conforming PEP.
 

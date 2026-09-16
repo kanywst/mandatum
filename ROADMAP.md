@@ -52,7 +52,7 @@ Gates: every specification rule has a corresponding negative test; the threat mo
 - ~~AuthZEN Authorization API 1.0 client~~ done
 - ~~Mapping from a verified chain to an evaluation request~~ done
 - ~~Conformance against the COAZ-MCP working group draft, with divergences documented rather than hidden~~ done, for the `tools/call` default mapping only
-- MCP tool-call enforcement middleware: the mapping exists, the middleware that calls it does not
+- ~~MCP tool-call enforcement middleware~~ done: `pkg/mcp` runs the four checks of §8 in order and refuses on any of them. It enforces `tools/call` and forwards every other method, which is a documented divergence from the binding's deny-by-default over unmapped methods rather than a gap left open
 - Declared mappings and CEL, which the binding defines and this does not read
 - Interoperability tested against at least three independent PDP implementations
 

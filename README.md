@@ -6,7 +6,7 @@
 
 **Verifiable delegation for AI agents.** An agent's authority to act becomes a signed chain rooted in a named human — attenuating at every hop, revocable at any link, and evaluated across whole action sequences.
 
-> **Status: early.** The format, the verifier, the signing layer and the issuer work end to end and are tested against real signatures. The AuthZEN binding and sequence evaluation work too, as do key resolution from an issuer's JWKS or SPIFFE bundle and local revocation from a published compact set. The audit log is not built, the sequence store is in-process only, nothing publishes a revocation set on a schedule, and nothing here has had a third-party security review. See [ROADMAP.md](ROADMAP.md) and the [threat model](docs/security/threat-model.md) for what that means in practice.
+> **Status: early.** The format, the verifier, the signing layer and the issuer work end to end and are tested against real signatures. The AuthZEN binding and sequence evaluation work too, as do key resolution from an issuer's JWKS or SPIFFE bundle, local revocation from a published compact set, and an MCP tool-call enforcement middleware that runs the four checks in the order the specification requires. The audit log is not built, the sequence store is in-process only, nothing publishes a revocation set on a schedule, and nothing here has had a third-party security review. See [ROADMAP.md](ROADMAP.md) and the [threat model](docs/security/threat-model.md) for what that means in practice.
 >
 > The specification is the thing to read and argue with: [`docs/spec/delegation-assertion.md`](docs/spec/delegation-assertion.md).
 
@@ -50,9 +50,10 @@ sequenceDiagram
     Note over B,PDP: enforcement · before the tool runs, every call
     B->>PEP: tools/call search.query + chain [MDA₀, MDA₁]
     PEP->>PEP: verify chain, offline (V1–V9)
-    PEP->>PEP: check the chain's history
+    PEP->>PEP: check the grant covers this call
     PEP->>PDP: subject = Alice · agent = retriever
     PDP-->>PEP: allow
+    PEP->>PEP: admit against the chain's history
     PEP-->>B: result
     end
 
@@ -67,7 +68,9 @@ sequenceDiagram
 
 Step 3 is the property that makes the rest work: every link commits to its parent by hash and may only narrow, so authority cannot grow on the way down. Revoke `MDA₁` and agent B loses everything, including whatever it delegated onward. Agent A and every sibling chain are untouched.
 
-Step 12 is the one nothing else does. Both calls are individually authorized. The pair is the exfiltration, and a check that sees one call at a time cannot tell.
+Step 6 is the one an enforcement point is most likely to skip, since the PDP is about to answer anyway: it compares the call against what the sponsor actually granted, so a PDP that says yes to everything still cannot authorize a tool nobody delegated. Step 9 is last for a reason — admitting an action is also recording it, and a call the PDP refused should not spend the chain's invocation budget.
+
+Step 13 is the one nothing else does. Both calls are individually authorized. The pair is the exfiltration, and a check that sees one call at a time cannot tell.
 
 ## Three places this fits
 
@@ -91,7 +94,7 @@ The failure mode for a project in this space is drifting into categories that ar
 
 - **Not an authorization engine.** Mandatum never decides. It establishes facts and hands them to a Policy Decision Point that already exists — OPA, Cedar, OpenFGA, SpiceDB, Cerbos, or anything conformant with the OpenID AuthZEN Authorization API. Engines are not the gap.
 - **Not a new protocol.** JOSE for the assertions, RFC 8693 for issuance, SPIFFE for workload identity, AuthZEN for decisions, RFC 6962 for the log. Where a standard fits, Mandatum uses it unchanged.
-- **Not a gateway, registry, sandbox, or agent runtime.** Those categories are crowded. Mandatum is a library meant to run *inside* agentgateway, ToolHive, or an MCP server. The MCP middleware that would call it is on the roadmap and is not written.
+- **Not a gateway, registry, sandbox, or agent runtime.** Those categories are crowded. Mandatum is a library meant to run *inside* agentgateway, ToolHive, or an MCP server. `pkg/mcp` is the `net/http` middleware that puts it there: it enforces `tools/call` and forwards everything else to the server it fronts.
 - **Not a blockchain.** The audit log is a Merkle tree. No consensus, no network, no token.
 
 ## Prior art, honestly
@@ -126,6 +129,12 @@ go test -run Example ./pkg/issue/ -v
 ```
 
 The source is [`pkg/issue/example_test.go`](pkg/issue/example_test.go), and it is the shortest honest description of what the library does.
+
+The enforcement side is a second one. A Policy Decision Point that permits everything asks to wipe the database, and the call is refused without the PDP being consulted at all:
+
+```bash
+go test -run Example ./pkg/mcp/ -v
+```
 
 ## Contributing
 

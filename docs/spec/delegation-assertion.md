@@ -2,7 +2,7 @@
 
 **English** | [日本語](delegation-assertion.ja.md)
 
-Status: **Draft 0.1**. Implemented, and not yet reviewed by anyone outside the project. Last updated: 2026-09-12
+Status: **Draft 0.1**. Implemented, and not yet reviewed by anyone outside the project. Last updated: 2026-09-16
 
 ## 1. Problem
 
@@ -22,7 +22,7 @@ Stating these first, because the failure mode for a project in this space is sco
 
 - **Not a new authorization engine.** Mandatum never decides. It carries the facts a decision needs and calls a Policy Decision Point that already exists (OPA, Cedar, OpenFGA, SpiceDB, Cerbos, or any AuthZEN-conformant PDP).
 - **Not a new wire protocol.** Delegation is expressed with JOSE, issued with RFC 8693 token exchange, and evaluated with the OpenID AuthZEN Authorization API 1.0. Where an existing standard fits, Mandatum uses it unchanged. The one place it deliberately goes beyond a standard is §3.1.
-- **Not a gateway.** Mandatum ships as a library, and is meant to run *inside* agentgateway, ToolHive, an MCP server, or an agent runtime rather than replace any of them. Middleware that plugs it into an MCP server is on the roadmap and does not exist yet.
+- **Not a gateway.** Mandatum ships as a library, and is meant to run *inside* agentgateway, ToolHive, an MCP server, or an agent runtime rather than replace any of them. The middleware that plugs it into an HTTP-based MCP server is `pkg/mcp`, which enforces `tools/call` and forwards every other method to the server it fronts.
 - **Not a registry, sandbox, or agent runtime.** Those categories are occupied.
 - **Not a blockchain.** The audit log is an RFC 6962-style Merkle tree. There is no consensus protocol, no network, and no token.
 
@@ -281,11 +281,32 @@ Verification alone does not stop a PDP granting more than the sponsor did. Nothi
 1. verify the chain;
 2. check the chain's capability set covers the request;
 3. ask the PDP;
-4. allow only if all three agree.
+4. admit the action against the chain's history (§9);
+5. allow only if all four agree.
 
 A PEP MUST perform step 2 and MUST refuse on its failure whatever the PDP said. This is what "a compromised PDP cannot manufacture authority that no sponsor granted" means, and it is a property of the enforcement point's ordering rather than of the format. An implementation that skips it has the confused deputy this specification exists to prevent, wearing a valid chain.
 
+Step 4 is last, after the PDP has allowed, because admitting an action is also recording it: the check and the write are one atomic operation (§9.1), and they have to be, or two agents acting at once under one chain each read a budget of one before either writes. A call the PDP refused did not happen, so counting it would let anything able to provoke a policy denial spend a sponsor's invocation budget without ever invoking a tool. The ordering costs an evaluation on a call a constraint will refuse, which is the cheaper of the two mistakes.
+
 Where the OIDF COAZ-MCP binding (WG draft, June 2026) specifies a mapping from MCP tool calls to AuthZEN requests, Mandatum follows it rather than defining a parallel one. What is implemented, what is not, and the one place the output goes beyond the binding are set out in [coaz-mcp-conformance.md](coaz-mcp-conformance.md).
+
+### 8.1 Carrying a chain in an MCP request
+
+The binding above says what a PDP is told. It does not say how the chain reaches the enforcement point in the first place, and a chain that travels differently in two deployments is a chain neither one's middleware can read.
+
+A chain is carried in the `_meta` object of the `tools/call` request parameters, under the key:
+
+```text
+io.github.kanywst.mandatum/chain
+```
+
+Its value is a JSON array of the chain's compact serializations as strings, ordered from the sponsor's grant to the acting agent's assertion — the same order §5 gives the chain and the order verification requires. An absent key, a value that is not an array of strings, or an empty array is a refusal; none of them is an unauthenticated call that may proceed.
+
+MCP reserves `_meta` for exactly this purpose and constrains what may be put there: a key's optional prefix is a series of dot-separated labels followed by a slash, implementations SHOULD use reverse DNS notation, and any prefix whose second label is `modelcontextprotocol` or `mcp` is reserved for the protocol itself. This key is reverse DNS for the project's own domain and its second label is `github`, so it is a third-party key by that rule and cannot be mistaken for one the protocol defines ([MCP, revision 2026-07-28, "General fields: `_meta`"](https://modelcontextprotocol.io/specification/2026-07-28/basic/index)).
+
+Nothing about the transport authenticates the chain. `_meta` is caller-supplied, and every link in it is signed, which is the only reason it can be carried somewhere a caller controls: the verifier re-derives claims from the signed bytes (§7, V3) rather than reading what the request asserts about them. A PEP MUST NOT treat the presence of a chain as evidence of anything before §7 has run over it.
+
+This binds a chain to the HTTP-based transports and to `tools/call`. The other methods the COAZ-MCP binding maps are not mapped here, and a chain says nothing about `tools/list` or `initialize`; an enforcement point implementing this is a per-call layer above MCP's own authorization, not a replacement for it.
 
 ## 9. Sequence-level evaluation
 
