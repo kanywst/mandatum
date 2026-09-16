@@ -218,12 +218,14 @@ The encoding is normative, because two implementations that index bits different
 | `v` | Format version. A verifier MUST reject a version it does not implement rather than guess. |
 | `sequence` | Monotonic publication counter. A verifier MUST refuse a set whose sequence is below the one it holds: accepting one reinstates every identifier revoked in between. |
 | `generated_at` | Seconds since the epoch. A verifier MUST treat a set older than its configured maximum age as an error, not as an empty set. |
-| `hashes` | *k*, the number of bit positions each identifier maps to. |
+| `hashes` | *k*, the number of bit positions each identifier maps to. MUST be between 1 and 64 inclusive; a verifier MUST refuse a set outside that range. |
 | `bits` | The filter, base64url without padding as in §5.1. Its length in bits is *m*. |
 
 For an identifier *jti*, let *h* = SHA-256(*jti*), let *h₁* and *h₂* be the first and second eight bytes of *h* read big-endian, and let the *i*-th bit position, for *i* from 0 to *k*−1, be (*h₁* + *i*·*h₂*) mod *m*. The publisher sets every position for every revoked identifier; a verifier reports "may be revoked" only if every position is set.
 
 Sizing is the publisher's choice, and the standard relations *m* = −*n*·ln *p* / (ln 2)² and *k* = (*m*/*n*)·ln 2 give a set whose false-positive rate is *p* at *n* revocations. The rate is a property of the published set, so a verifier does not need to be told it.
+
+The bound on *k* is the one place the publisher's choice is not free, and it is a denial-of-service bound rather than a correctness one. A lookup costs *k* hash positions and runs before every authorized action, so an unbounded *k* makes the cost of enforcement a number the publisher writes down: a set of eighty bytes declaring *k* in the billions takes seconds per lookup and asks for tens of gigabytes to answer it. The document that says which agents are revoked would double as a way to stop the enforcement point evaluating anything. Sixty-four is past any operational need rather than a tuned figure — at optimal sizing *k* = −log₂ *p*, so *k* = 64 is a rate around 10⁻¹⁹, and a set wanting one in a billion uses *k* = 30. A publisher that cannot express its intended rate within the bound is asking for a rate no deployment needs.
 
 A false negative is impossible by construction, which is the property that makes the fast path safe: an identifier the filter rejects was not in the set the publisher built, so no lookup is needed and none is made.
 
