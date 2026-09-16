@@ -4,6 +4,12 @@ name: fuzz-nightly
 # regressions but not much else. This runs a real campaign and keeps any
 # crasher it finds, so the failure is reproducible rather than a log line
 # saying something went wrong overnight.
+#
+# The v0.1 gate in ROADMAP.md is counted in hours per target, and this is the
+# only job that accumulates them: the pull-request pass and the release pass
+# are 60 seconds. A target this workflow does not run therefore has no hours
+# at all, however often the others pass over it, which is why the list is
+# discovered rather than written down.
 
 on:
   schedule:
@@ -25,16 +31,93 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  targets:
+    name: find the packages that have fuzz targets
+    runs-on: ubuntu-latest
+    outputs:
+      packages: ${{ steps.list.outputs.packages }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No job in this repository pushes, so the checkout token has no
+          # reason to outlive the step that used it.
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: List them
+        id: list
+        # Discovered, not enumerated. A hand-written matrix is a second list
+        # of fuzz targets that has to be kept in step with the first, and it
+        # was not: `pkg/revoke` arrived with a target and never joined the
+        # matrix, so the one job that accumulates campaign hours never ran it.
+        # `make fuzz` already derives the same list from `go list`, and this
+        # is that derivation, one package per matrix job so a long campaign
+        # is parallel rather than serialised into the six-hour job limit.
+        run: |
+          set -euo pipefail
+
+          # The enumeration's own exit status, which a process substitution
+          # would discard: `go list ./...` exits non-zero when a package
+          # cannot be loaded — an unresolvable import, two package names in
+          # one directory — and reading its output through `< <(...)` would
+          # walk whatever it managed to print and call that the module.
+          #
+          # Only stdout is captured. `go` writes progress to stderr on a
+          # perfectly successful run — "go: downloading", a toolchain switch —
+          # and merging the streams would put those lines in the list of
+          # packages. Unredirected, they land in the job log where they belong.
+          #
+          # This does not catch everything. A directory whose files are all
+          # excluded by build constraints is omitted from the listing with a
+          # zero exit and nothing on stderr, so a fuzz target behind a build
+          # tag is invisible here. That is a property of `go list`, and this
+          # module has no build tags; a change that adds one needs a better
+          # enumeration than this.
+          if ! listed=$(go list ./...); then
+            echo "::error::go list failed; the campaign cannot know what the module contains"
+            exit 1
+          fi
+
+          packages=()
+          while IFS= read -r pkg; do
+            # A listing that fails and a listing that finds nothing are not the
+            # same answer. `go test -list` fails when a package's test files do
+            # not compile, and discarding that would drop the package from the
+            # matrix and leave the run green — the silent no-fuzz this change
+            # exists to stop, arriving from the other side. So it is an error
+            # rather than an absence.
+            if ! listing=$(go test -list 'Fuzz.*' "$pkg"); then
+              echo "::error::listing fuzz targets in ${pkg} failed; the campaign cannot know what it is skipping"
+              exit 1
+            fi
+            if grep -q '^Fuzz' <<<"$listing"; then
+              packages+=("$pkg")
+            fi
+          done <<<"$listed"
+
+          # An empty matrix is zero jobs, and zero jobs is a green workflow
+          # that fuzzed nothing. Refuse that too.
+          if [ ${#packages[@]} -eq 0 ]; then
+            echo "::error::no package in this module declares a Fuzz target"
+            echo "A nightly campaign with nothing to fuzz is a green run that proves nothing."
+            exit 1
+          fi
+
+          printf 'fuzzing: %s\n' "${packages[@]}"
+          printf '%s\n' "${packages[@]}" |
+            jq -Rsc 'split("\n") | map(select(length > 0))' |
+            { read -r packages; echo "packages=$packages" >> "$GITHUB_OUTPUT"; }
+
   fuzz:
     name: fuzz ${{ matrix.package }}
+    needs: targets
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        package:
-          - ./pkg/jose
-          - ./pkg/mda
-          - ./pkg/verify
+        package: ${{ fromJSON(needs.targets.outputs.packages) }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:

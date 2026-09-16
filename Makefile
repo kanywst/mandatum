@@ -24,8 +24,16 @@ cover: ## Run tests and report coverage
 
 .PHONY: fuzz
 fuzz: ## Short fuzzing pass over parsing and verification
-	@for pkg in $$($(GO) list ./...); do \
-		for target in $$($(GO) test -list 'Fuzz.*' $$pkg 2>/dev/null | grep '^Fuzz' || true); do \
+	@packages=$$($(GO) list ./...) || { \
+		echo "go list failed; the pass cannot know what the module contains"; \
+		exit 1; \
+	}; \
+	for pkg in $$packages; do \
+		listing=$$($(GO) test -list 'Fuzz.*' $$pkg) || { \
+			echo "listing fuzz targets in $$pkg failed"; \
+			exit 1; \
+		}; \
+		for target in $$(echo "$$listing" | grep '^Fuzz' || true); do \
 			echo "fuzzing $$target in $$pkg"; \
 			$(GO) test -run '^$$' -fuzz "^$$target$$" -fuzztime=$(FUZZTIME) $$pkg || exit 1; \
 		done; \
