@@ -64,15 +64,19 @@ jobs:
           # one directory — and reading its output through `< <(...)` would
           # walk whatever it managed to print and call that the module.
           #
-          # It does not catch everything. A directory whose files are all
+          # Only stdout is captured. `go` writes progress to stderr on a
+          # perfectly successful run — "go: downloading", a toolchain switch —
+          # and merging the streams would put those lines in the list of
+          # packages. Unredirected, they land in the job log where they belong.
+          #
+          # This does not catch everything. A directory whose files are all
           # excluded by build constraints is omitted from the listing with a
           # zero exit and nothing on stderr, so a fuzz target behind a build
           # tag is invisible here. That is a property of `go list`, and this
           # module has no build tags; a change that adds one needs a better
           # enumeration than this.
-          if ! listed=$(go list ./... 2>&1); then
+          if ! listed=$(go list ./...); then
             echo "::error::go list failed; the campaign cannot know what the module contains"
-            echo "$listed"
             exit 1
           fi
 
@@ -82,11 +86,10 @@ jobs:
             # same answer. `go test -list` fails when a package's test files do
             # not compile, and discarding that would drop the package from the
             # matrix and leave the run green — the silent no-fuzz this change
-            # exists to stop, arriving from the other side. So it is an error,
-            # and stderr is kept.
-            if ! listing=$(go test -list 'Fuzz.*' "$pkg" 2>&1); then
+            # exists to stop, arriving from the other side. So it is an error
+            # rather than an absence.
+            if ! listing=$(go test -list 'Fuzz.*' "$pkg"); then
               echo "::error::listing fuzz targets in ${pkg} failed; the campaign cannot know what it is skipping"
-              echo "$listing"
               exit 1
             fi
             if grep -q '^Fuzz' <<<"$listing"; then
