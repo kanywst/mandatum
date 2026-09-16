@@ -51,7 +51,7 @@ The identity regexp matters. Verifying only that *something* signed the file pro
 | CodeQL, `security-extended` | every pull request, every push to `main`, and weekly |
 | OpenSSF Scorecard | default branch |
 | Developer Certificate of Origin sign-off | every pull request except Dependabot's, which cannot sign off |
-| Changelog entry exists for the tag | before publishing a release |
+| The release notes build from the tag's changelog entry | before publishing a release, and again to write them |
 | `LICENSE` is the unmodified Apache-2.0 text | every pull request, every push to `main`, and weekly |
 
 The release workflow re-runs the build, the tests, a short fuzzing pass and the license check on the tag rather than trusting the pull request that produced it, because the thing being published is the tag.

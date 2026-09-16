@@ -6,6 +6,10 @@ Each release also records which Delegation Assertion format versions (`mdt.v`) i
 
 ## [Unreleased]
 
+### Changed
+
+- The release notes are the tag's changelog entry, rather than a fixed page saying to go and read it. `hack/release-notes.sh` extracts the section for a version, rewrites its relative links to absolute ones pinned at the tag — a release page is read outside the repository, and a link resolving against whatever `main` says today points at a document that has moved on from the release it describes — and appends the verification instructions. The release workflow runs it twice: once in the verify job for its exit status, so a tag with no entry fails before anything is published, and once to write the notes. That replaces the `grep` that checked the same thing beside the step that needed it. It also makes three sentences in `VERSIONING.md` true that were not: the notes now do record which `mdt.v` values a release accepts and issues, and a deprecation or a compatibility break named in the changelog now reaches the page people actually read.
+
 ### Added
 
 - `pkg/mcp`: the enforcement point. Everything else in this repository establishes facts; this is the one place that acts on them, and it runs §8's checks in the order §8 gives them — verify the chain, check the chain's own grant covers the call, ask the PDP, admit the action against the chain's history — refusing on any one of them and naming which refused. A PDP that allows everything still cannot authorize a tool the sponsor never granted, and is not even asked, because the grant check comes first; the test that proves it asserts the PDP saw zero requests. `Enforcer.Middleware` is the `net/http` half: it reads the chain from `_meta`, refuses a body it cannot parse rather than forwarding it, and tells a refused caller which stage said no and nothing else, while the reason goes to the operator's log — flattened onto one line, because a reason quotes the request back and a newline in it is a log entry the caller wrote.

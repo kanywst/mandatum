@@ -44,14 +44,11 @@ jobs:
         run: |
           go install github.com/google/go-licenses@latest
           make license-check
-      - name: Tag is described in the changelog
-        run: |
-          version="${GITHUB_REF_NAME#v}"
-          if ! grep -qF "[${version}]" CHANGELOG.md; then
-            echo "CHANGELOG.md has no entry for ${version}."
-            echo "A release nobody wrote down is a release nobody can audit."
-            exit 1
-          fi
+      - name: The release notes can be built from the changelog
+        # The same script the publish job runs, called here for its exit
+        # status. A tag with no changelog section fails before anything is
+        # published rather than at the step that would have used it.
+        run: ./hack/release-notes.sh "${GITHUB_REF_NAME#v}" > /dev/null
 
   release:
     name: publish
@@ -121,26 +118,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.ref_name }}
         run: |
+          # The notes are this version's changelog section, with its links
+          # resolved against the tag, plus how to verify the artifacts. A
+          # release page that says "see CHANGELOG.md" makes whoever is
+          # deciding whether to upgrade leave the page to find out what they
+          # are being offered.
           notes=$(mktemp)
-          cat > "$notes" <<'EOF'
-          Verify this release before using it:
-
-          ```bash
-          cosign verify-blob \
-            --bundle checksums.txt.bundle \
-            --certificate-identity-regexp 'https://github.com/kanywst/mandatum/.github/workflows/release.yml@.*' \
-            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-            checksums.txt
-
-          sha256sum -c checksums.txt
-          ```
-
-          An SPDX SBOM is attached. Build provenance is attested and can be
-          checked with `gh attestation verify`.
-
-          See CHANGELOG.md for what changed, including which Delegation
-          Assertion format versions this release accepts and issues.
-          EOF
+          ./hack/release-notes.sh "${TAG#v}" > "$notes"
           # A SemVer pre-release identifier is the hyphen after the patch
           # number. VERSIONING.md says a pre-release carries no compatibility
           # promise and is not supported, and a release GitHub serves as
