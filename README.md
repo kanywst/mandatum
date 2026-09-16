@@ -4,7 +4,7 @@
 
 **English** | [日本語](README.ja.md)
 
-**Verifiable delegation for AI agents.** An agent's authority to act becomes a signed chain rooted in a named human — attenuating at every hop, revocable at any link, evaluated across whole action sequences, and recorded in a tamper-evident log.
+**Verifiable delegation for AI agents.** An agent's authority to act becomes a signed chain rooted in a named human — attenuating at every hop, revocable at any link, and evaluated across whole action sequences.
 
 > **Status: early.** The format, the verifier, the signing layer and the issuer work end to end and are tested against real signatures. The AuthZEN binding and sequence evaluation work too, as do key resolution from an issuer's JWKS or SPIFFE bundle and local revocation from a published compact set. The audit log is not built, the sequence store is in-process only, nothing publishes a revocation set on a schedule, and nothing here has had a third-party security review. See [ROADMAP.md](ROADMAP.md) and the [threat model](docs/security/threat-model.md) for what that means in practice.
 >
