@@ -58,6 +58,24 @@ jobs:
         run: |
           set -euo pipefail
 
+          # The enumeration's own exit status, which a process substitution
+          # would discard: `go list ./...` exits non-zero when a package
+          # cannot be loaded — an unresolvable import, two package names in
+          # one directory — and reading its output through `< <(...)` would
+          # walk whatever it managed to print and call that the module.
+          #
+          # It does not catch everything. A directory whose files are all
+          # excluded by build constraints is omitted from the listing with a
+          # zero exit and nothing on stderr, so a fuzz target behind a build
+          # tag is invisible here. That is a property of `go list`, and this
+          # module has no build tags; a change that adds one needs a better
+          # enumeration than this.
+          if ! listed=$(go list ./... 2>&1); then
+            echo "::error::go list failed; the campaign cannot know what the module contains"
+            echo "$listed"
+            exit 1
+          fi
+
           packages=()
           while IFS= read -r pkg; do
             # A listing that fails and a listing that finds nothing are not the
@@ -74,7 +92,7 @@ jobs:
             if grep -q '^Fuzz' <<<"$listing"; then
               packages+=("$pkg")
             fi
-          done < <(go list ./...)
+          done <<<"$listed"
 
           # An empty matrix is zero jobs, and zero jobs is a green workflow
           # that fuzzed nothing. Refuse that too.
