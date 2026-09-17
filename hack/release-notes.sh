@@ -47,12 +47,28 @@ base="https://github.com/${repository}/blob/${tag}/"
 # heading rather than under it, so the oldest section in the file has no
 # heading below it to stop at and would run to the end — silently, and only
 # for the oldest section, which is exactly the one a first release publishes.
+# Both boundaries are ignored inside a fenced code block. This changelog
+# quotes wire format — JSON claim sets, JWS payloads — and a fence holding a
+# line that begins `## ` or looks like a link definition (`[^1]: ` is valid
+# Markdown) would end the section early. That failure is silent in a way the
+# last one was not: the triggering line is dropped rather than leaked, so
+# the output looks like a shorter entry rather than a wrong one.
 section=$(awk -v heading="## [${version}]" '
   index($0, heading) == 1 { inside = 1; next }
+  inside && /^[[:space:]]*```/ { fenced = !fenced; print; next }
+  inside && fenced { print; next }
   inside && /^## / { exit }
   inside && /^\[[^]]+\]:[[:space:]]/ { exit }
   inside { print }
-' "$changelog")
+  END { if (fenced) { exit 3 } }
+' "$changelog") || {
+  status=$?
+  if [ "$status" -eq 3 ]; then
+    echo "$0: the ${version} entry opens a code fence it never closes" >&2
+    exit 1
+  fi
+  exit "$status"
+}
 
 if [ -z "${section//[[:space:]]/}" ]; then
   echo "$0: $changelog has no entry for ${version}." >&2

@@ -128,6 +128,51 @@ jobs:
               echo "ok: ${version}"
             done
 
+      - name: a section boundary inside a code fence is not a boundary
+        # The check above cannot catch this one. A boundary matched inside a
+        # fence truncates the section, which *removes* the offending line
+        # rather than leaking it, so the output is a short entry rather than
+        # a wrong one and nothing fails. This changelog quotes JSON claim
+        # sets and JWS payloads, so a fence holding a line that starts `## `
+        # is a question of when, not whether.
+        run: |
+          set -euo pipefail
+          fixture=$(mktemp -d)
+          cat > "${fixture}/CHANGELOG.md" <<'FIXTURE'
+          # Changelog
+
+          ## [9.9.9] - 2026-01-01
+
+          Before the fence.
+
+          ```markdown
+          ## [0.0.1] - a heading inside an example
+          [^1]: a footnote definition inside an example
+          ```
+
+          After the fence.
+
+          ## [9.9.8] - 2026-01-01
+
+          The older entry, which must not appear.
+
+          [9.9.9]: https://example.com/9.9.9
+          FIXTURE
+
+          notes=$(CHANGELOG_FILE="${fixture}/CHANGELOG.md" ./hack/release-notes.sh 9.9.9)
+
+          for needle in 'Before the fence.' 'After the fence.'; do
+            if ! printf '%s\n' "$notes" | grep -qF "$needle"; then
+              echo "::error::the section was truncated at a boundary inside a code fence"
+              exit 1
+            fi
+          done
+          if printf '%s\n' "$notes" | grep -qF 'The older entry'; then
+            echo "::error::the section ran past its own end into the next entry"
+            exit 1
+          fi
+          echo "ok: a fenced boundary is content"
+
       - name: documents do not reference documents that do not exist
         # A sentence in the present tense about a file nobody has written is
         # the same defect as a claim the code does not honour, and it has
