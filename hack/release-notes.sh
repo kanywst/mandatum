@@ -103,23 +103,47 @@ resolved=$(awk -v heading="## [${version}]" -v base="$base" '
       gsub(/[[:space:]]/, "", closer)
       if (substr(closer, 1, 1) == fence_char && length(closer) >= fence_len) { fenced = 0 }
     }
-    if (inside) { print }
+    if (inside) {
+      # A changelog heading swallowed by a fence is ordinary when an entry
+      # quotes another entry, and is the symptom of an unclosed fence when
+      # the entry then never reaches a boundary. END tells the two apart.
+      if ($0 ~ /^## /) { swallowed_heading = 1 }
+      print
+    }
     next
   }
 
   index($0, heading) == 1 { inside = 1; next }
   ! inside { next }
 
-  /^## / { exit }
-  /^\[[^]]+\]:[[:space:]]*[^[:space:]]/ { exit }
+  /^## / { ended = 1; exit }
+  /^\[[^]]+\]:[[:space:]]*[^[:space:]]/ { ended = 1; exit }
 
   { print rewrite($0) }
 
-  END { if (inside && fenced) { exit 3 } }
+  # Reaching the end of the file with a fence open means the file is
+  # malformed, whichever entry was asked for. The consequence is not a
+  # cosmetic one: an unclosed fence is closed by whatever fence the next
+  # entry opens, so two entries merge into one set of notes with nothing to
+  # show for it — and markdownlint does not report an unclosed fence at all,
+  # so this is the only place it is caught.
+  END {
+    if (fenced) { exit 3 }
+    # Ran to the end of the file, having passed a heading inside a fence.
+    # The oldest entry legitimately ends at the end of the file; one that
+    # swallowed a heading on the way there did not end, it kept going.
+    if (inside && ! ended && swallowed_heading) { exit 4 }
+  }
 ' "$changelog") || {
   status=$?
+  if [ "$status" -eq 4 ]; then
+    echo "$0: the ${version} entry ran to the end of $changelog through a heading inside a code fence." >&2
+    echo "A fence somewhere in the entry is closed by a later one rather than by its own." >&2
+    exit 1
+  fi
   if [ "$status" -eq 3 ]; then
-    echo "$0: the ${version} entry opens a code fence it never closes" >&2
+    echo "$0: $changelog has a code fence that is never closed." >&2
+    echo "An unclosed fence is closed by the next entry's own delimiter, which merges the two." >&2
     exit 1
   fi
   exit "$status"
