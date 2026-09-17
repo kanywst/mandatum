@@ -211,31 +211,6 @@ jobs:
             exit 1
           fi
 
-          # The quiet version of the same defect: the unclosed fence is
-          # closed by a later entry of its own delimiter, so the parity works out,
-          # nothing is unbalanced at the end of the file, and two entries
-          # become one set of notes. markdownlint reports nothing here.
-          cat > "${fixture}/merged.md" <<'FIXTURE'
-          # Changelog
-
-          ## [9.9.9] - 2026-01-01
-
-          ```json
-          {"unclosed": true}
-
-          ## [9.9.8] - 2026-01-01
-
-          ```json
-          {"second": true}
-          ```
-
-          Tail.
-          FIXTURE
-          if CHANGELOG_FILE="${fixture}/merged.md" ./hack/release-notes.sh 9.9.9 > /dev/null 2>&1; then
-            echo "::error::two entries were merged into one set of notes without an error"
-            exit 1
-          fi
-
           echo "ok: a fenced boundary is content, and an unclosed fence is an error"
 
       - name: documents do not reference documents that do not exist

@@ -103,44 +103,36 @@ resolved=$(awk -v heading="## [${version}]" -v base="$base" '
       gsub(/[[:space:]]/, "", closer)
       if (substr(closer, 1, 1) == fence_char && length(closer) >= fence_len) { fenced = 0 }
     }
-    if (inside) {
-      # A changelog heading swallowed by a fence is ordinary when an entry
-      # quotes another entry, and is the symptom of an unclosed fence when
-      # the entry then never reaches a boundary. END tells the two apart.
-      if ($0 ~ /^## /) { swallowed_heading = 1 }
-      print
-    }
+    if (inside) { print }
     next
   }
 
   index($0, heading) == 1 { inside = 1; next }
   ! inside { next }
 
-  /^## / { ended = 1; exit }
-  /^\[[^]]+\]:[[:space:]]*[^[:space:]]/ { ended = 1; exit }
+  /^## / { exit }
+  /^\[[^]]+\]:[[:space:]]*[^[:space:]]/ { exit }
 
   { print rewrite($0) }
 
   # Reaching the end of the file with a fence open means the file is
-  # malformed, whichever entry was asked for. The consequence is not a
-  # cosmetic one: an unclosed fence is closed by whatever fence the next
-  # entry opens, so two entries merge into one set of notes with nothing to
-  # show for it — and markdownlint does not report an unclosed fence at all,
-  # so this is the only place it is caught.
-  END {
-    if (fenced) { exit 3 }
-    # Ran to the end of the file, having passed a heading inside a fence.
-    # The oldest entry legitimately ends at the end of the file; one that
-    # swallowed a heading on the way there did not end, it kept going.
-    if (inside && ! ended && swallowed_heading) { exit 4 }
-  }
+  # malformed, whichever entry was asked for, and markdownlint does not
+  # report an unclosed fence at all — so this is the only place it is caught.
+  #
+  # It catches the unbalanced file, not every consequence of one. An entry
+  # that opens a fence and never closes it can have that fence closed by a
+  # later entry, leaving the file balanced and two entries merged into one
+  # set of notes. Telling that apart from an entry legitimately quoting
+  # another entry needs to know where the second entry starts, which is the
+  # thing being computed. Rules tried and rejected: any changelog heading
+  # inside a fence (rejects quoting), a heading inside a fence still open at
+  # the end (misses it, since the stray fence does close), and reaching the
+  # end of the file after one (rejects a quoting oldest entry). The input is
+  # a file this project writes, CI builds the notes for every entry in it,
+  # and the unbalanced case is caught above.
+  END { if (fenced) { exit 3 } }
 ' "$changelog") || {
   status=$?
-  if [ "$status" -eq 4 ]; then
-    echo "$0: the ${version} entry ran to the end of $changelog through a heading inside a code fence." >&2
-    echo "A fence somewhere in the entry is closed by a later one rather than by its own." >&2
-    exit 1
-  fi
   if [ "$status" -eq 3 ]; then
     echo "$0: $changelog has a code fence that is never closed." >&2
     echo "An unclosed fence is closed by the next entry's own delimiter, which merges the two." >&2
