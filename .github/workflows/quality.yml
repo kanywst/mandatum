@@ -154,6 +154,9 @@ jobs:
 
           ~~~markdown
           ## [0.0.2] - a heading inside a tilde fence
+          ```
+          ## [0.0.3] - a heading inside a fence inside a fence
+          ```
           ~~~
 
           After the fence.

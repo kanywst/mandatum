@@ -51,12 +51,31 @@ base="https://github.com/${repository}/blob/${tag}/"
 # quotes wire format — JSON claim sets, JWS payloads — and a fence holding a
 # line that begins `## ` or looks like a link definition (`[^1]: ` is valid
 # Markdown) would end the section early. That failure is silent in a way the
-# last one was not: the triggering line is dropped rather than leaked, so
+# leaking one is not: the triggering line is dropped rather than leaked, so
 # the output looks like a shorter entry rather than a wrong one.
+#
+# A fence closes only on its own delimiter, and on a run at least as long as
+# the one that opened it, which is what CommonMark says and what a toggle
+# flipping on either character gets wrong: a tilde block quoting a backtick
+# block would end at the inner example.
 section=$(awk -v heading="## [${version}]" '
   index($0, heading) == 1 { inside = 1; next }
-  inside && /^[[:space:]]*(```|~~~)/ { fenced = !fenced; print; next }
-  inside && fenced { print; next }
+  inside && !fenced && match($0, /^[[:space:]]*(`{3,}|~{3,})/) {
+    marker = substr($0, RSTART, RLENGTH)
+    sub(/^[[:space:]]*/, "", marker)
+    fence_char = substr(marker, 1, 1)
+    fence_len = length(marker)
+    fenced = 1
+    print; next
+  }
+  inside && fenced {
+    if (match($0, /^[[:space:]]*(`{3,}|~{3,})[[:space:]]*$/)) {
+      closer = substr($0, RSTART, RLENGTH)
+      gsub(/[[:space:]]/, "", closer)
+      if (substr(closer, 1, 1) == fence_char && length(closer) >= fence_len) { fenced = 0 }
+    }
+    print; next
+  }
   inside && /^## / { exit }
   inside && /^\[[^]]+\]:[[:space:]]/ { exit }
   inside { print }
@@ -80,8 +99,22 @@ fi
 # left alone, and fenced code blocks are skipped: a JSON example containing
 # the same two characters is not a link.
 resolved=$(printf '%s\n' "$section" | awk -v base="$base" '
-  /^[[:space:]]*(```|~~~)/ { fenced = !fenced; print; next }
-  fenced { print; next }
+  !fenced && match($0, /^[[:space:]]*(`{3,}|~{3,})/) {
+    marker = substr($0, RSTART, RLENGTH)
+    sub(/^[[:space:]]*/, "", marker)
+    fence_char = substr(marker, 1, 1)
+    fence_len = length(marker)
+    fenced = 1
+    print; next
+  }
+  fenced {
+    if (match($0, /^[[:space:]]*(`{3,}|~{3,})[[:space:]]*$/)) {
+      closer = substr($0, RSTART, RLENGTH)
+      gsub(/[[:space:]]/, "", closer)
+      if (substr(closer, 1, 1) == fence_char && length(closer) >= fence_len) { fenced = 0 }
+    }
+    print; next
+  }
   {
     line = $0
     out = ""
