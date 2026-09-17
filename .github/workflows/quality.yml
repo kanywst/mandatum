@@ -211,6 +211,46 @@ jobs:
             exit 1
           fi
 
+          # A link target may contain balanced parentheses, a reference-style
+          # link would arrive without its definition, and a version heading
+          # written twice is a boundary rather than a second start.
+          cat > "${fixture}/shapes.md" <<'FIXTURE'
+          # Changelog
+
+          ## [9.9.9] - 2026-01-01
+
+          See [details](docs/Foo_(bar).md).
+
+          ## [9.9.9] - 2026-01-01
+
+          The duplicate heading, which must not be appended.
+
+          [9.9.9]: https://example.com/9.9.9
+          FIXTURE
+          notes=$(CHANGELOG_FILE="${fixture}/shapes.md" ./hack/release-notes.sh 9.9.9)
+          if ! printf '%s\n' "$notes" | grep -qF 'blob/v9.9.9/docs/Foo_(bar).md'; then
+            echo "::error::a link target containing parentheses was truncated"
+            exit 1
+          fi
+          if printf '%s\n' "$notes" | grep -qF 'must not be appended'; then
+            echo "::error::a repeated version heading restarted the section instead of ending it"
+            exit 1
+          fi
+
+          cat > "${fixture}/reference.md" <<'FIXTURE'
+          # Changelog
+
+          ## [9.9.9] - 2026-01-01
+
+          See [the roadmap][rm].
+
+          [rm]: https://example.com/roadmap
+          FIXTURE
+          if CHANGELOG_FILE="${fixture}/reference.md" ./hack/release-notes.sh 9.9.9 > /dev/null 2>&1; then
+            echo "::error::a reference-style link was accepted; its definition is not in the notes"
+            exit 1
+          fi
+
           echo "ok: a fenced boundary is content, and an unclosed fence is an error"
 
       - name: documents do not reference documents that do not exist

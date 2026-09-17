@@ -70,7 +70,7 @@ resolved=$(awk -v heading="## [${version}]" -v base="$base" '
   # resolved against the tag.
   function rewrite(line,   out, before, token, target) {
     out = ""
-    while (match(line, /\]\([^)]*\)/)) {
+    while (match(line, /\]\([^()]*(\([^()]*\)[^()]*)*\)/)) {
       before = substr(line, 1, RSTART - 1)
       token = substr(line, RSTART, RLENGTH)
       target = substr(token, 3, RLENGTH - 3)
@@ -107,11 +107,17 @@ resolved=$(awk -v heading="## [${version}]" -v base="$base" '
     next
   }
 
-  index($0, heading) == 1 { inside = 1; next }
+  index($0, heading) == 1 && ! inside { inside = 1; next }
   ! inside { next }
 
   /^## / { exit }
   /^\[[^]]+\]:[[:space:]]*[^[:space:]]/ { exit }
+
+  # A reference-style link would arrive in the notes without its
+  # definition, which lives in the block below the last entry and is
+  # deliberately not extracted. It renders as literal brackets on the
+  # release page. Changelog entries use inline links.
+  /\]\[[^]]*\]/ { exit 5 }
 
   { print rewrite($0) }
 
@@ -131,8 +137,14 @@ resolved=$(awk -v heading="## [${version}]" -v base="$base" '
   # a file this project writes, CI builds the notes for every entry in it,
   # and the unbalanced case is caught above.
   END { if (fenced) { exit 3 } }
+
 ' "$changelog") || {
   status=$?
+  if [ "$status" -eq 5 ]; then
+    echo "$0: the ${version} entry uses a reference-style link." >&2
+    echo "Its definition lives below the last entry and is not part of any entry, so the link would arrive dead. Use an inline link." >&2
+    exit 1
+  fi
   if [ "$status" -eq 3 ]; then
     echo "$0: $changelog has a code fence that is never closed." >&2
     echo "An unclosed fence is closed by the next entry's own delimiter, which merges the two." >&2
