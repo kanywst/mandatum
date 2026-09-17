@@ -38,12 +38,19 @@ base="https://github.com/${repository}/blob/${tag}/"
 
 [ -f "$changelog" ] || { echo "$0: no $changelog here" >&2; exit 1; }
 
-# The section runs from this version's heading to the next release heading.
+# The section runs from this version's heading to the next release heading,
+# or to the block of reference-style link definitions the file ends with.
 # Matched at the start of the line so that a version mentioned in prose
 # cannot open a section.
+#
+# The second boundary is not decoration. Those definitions sit after the last
+# heading rather than under it, so the oldest section in the file has no
+# heading below it to stop at and would run to the end — silently, and only
+# for the oldest section, which is exactly the one a first release publishes.
 section=$(awk -v heading="## [${version}]" '
   index($0, heading) == 1 { inside = 1; next }
   inside && /^## / { exit }
+  inside && /^\[[^]]+\]:[[:space:]]/ { exit }
   inside { print }
 ' "$changelog")
 

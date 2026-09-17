@@ -108,6 +108,26 @@ jobs:
           fail: true
         continue-on-error: true
 
+      - name: release notes build for every changelog entry
+        # Every entry, not just the one a tag is about, because the boundary
+        # a section extractor gets wrong is the last one: the oldest entry
+        # has no heading below it and runs into the file's link definitions.
+        # That is the entry a project's first release publishes, and the
+        # only one never exercised until it matters.
+        run: |
+          set -euo pipefail
+          grep -oE '^## \[[^]]+\]' CHANGELOG.md |
+            sed -E 's/^## \[//; s/\]$//' |
+            grep -v '^Unreleased$' |
+            while IFS= read -r version; do
+              notes=$(./hack/release-notes.sh "$version")
+              if printf '%s\n' "$notes" | grep -qE '^\[[^]]+\]:[[:space:]]'; then
+                echo "::error::the notes for ${version} carry the changelog's link definitions"
+                exit 1
+              fi
+              echo "ok: ${version}"
+            done
+
       - name: documents do not reference documents that do not exist
         # A sentence in the present tense about a file nobody has written is
         # the same defect as a claim the code does not honour, and it has
