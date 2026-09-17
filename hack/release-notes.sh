@@ -47,6 +47,9 @@ base="https://github.com/${repository}/blob/${tag}/"
 # heading rather than under it, so the oldest section in the file has no
 # heading below it to stop at and would run to the end — silently, and only
 # for the oldest section, which is exactly the one a first release publishes.
+# The space after the colon is optional, because CommonMark makes it optional:
+# `[label]:https://example.com` is a definition, and a boundary that misses it
+# is the same silent run to the end for anyone who writes them that way.
 # Both boundaries are ignored inside a fenced code block. This changelog
 # quotes wire format — JSON claim sets, JWS payloads — and a fence holding a
 # line that begins `## ` or looks like a link definition (`[^1]: ` is valid
@@ -77,7 +80,7 @@ section=$(awk -v heading="## [${version}]" '
     print; next
   }
   inside && /^## / { exit }
-  inside && /^\[[^]]+\]:[[:space:]]/ { exit }
+  inside && /^\[[^]]+\]:[[:space:]]*[^[:space:]]/ { exit }
   inside { print }
   END { if (fenced) { exit 3 } }
 ' "$changelog") || {

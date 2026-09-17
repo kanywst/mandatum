@@ -166,6 +166,7 @@ jobs:
           The older entry, which must not appear.
 
           [9.9.9]: https://example.com/9.9.9
+          [9.9.8]:https://example.com/9.9.8
           FIXTURE
 
           notes=$(CHANGELOG_FILE="${fixture}/CHANGELOG.md" ./hack/release-notes.sh 9.9.9)
