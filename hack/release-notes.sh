@@ -84,16 +84,18 @@ resolved=$(awk -v heading="## [${version}]" -v base="$base" '
     return out line
   }
 
-  index($0, heading) == 1 { inside = 1; next }
-  ! inside { next }
-
+  # Fence tracking runs from the top of the file, not from the heading:
+  # an entry that quotes another entry inside a fence would otherwise open
+  # the section at the quotation. The same lines are printed only once the
+  # walk is inside the section.
   ! fenced && match($0, /^[[:space:]]*(`{3,}|~{3,})/) {
     marker = substr($0, RSTART, RLENGTH)
     sub(/^[[:space:]]*/, "", marker)
     fence_char = substr(marker, 1, 1)
     fence_len = length(marker)
     fenced = 1
-    print; next
+    if (inside) { print }
+    next
   }
   fenced {
     if (match($0, /^[[:space:]]*(`{3,}|~{3,})[[:space:]]*$/)) {
@@ -101,15 +103,19 @@ resolved=$(awk -v heading="## [${version}]" -v base="$base" '
       gsub(/[[:space:]]/, "", closer)
       if (substr(closer, 1, 1) == fence_char && length(closer) >= fence_len) { fenced = 0 }
     }
-    print; next
+    if (inside) { print }
+    next
   }
+
+  index($0, heading) == 1 { inside = 1; next }
+  ! inside { next }
 
   /^## / { exit }
   /^\[[^]]+\]:[[:space:]]*[^[:space:]]/ { exit }
 
   { print rewrite($0) }
 
-  END { if (fenced) { exit 3 } }
+  END { if (inside && fenced) { exit 3 } }
 ' "$changelog") || {
   status=$?
   if [ "$status" -eq 3 ]; then

@@ -141,6 +141,16 @@ jobs:
           cat > "${fixture}/CHANGELOG.md" <<'FIXTURE'
           # Changelog
 
+          ## [Unreleased]
+
+          An entry that quotes the entry below it:
+
+          ```markdown
+          ## [9.9.9] - 2026-01-01
+
+          The quotation, which must not be mistaken for the entry.
+          ```
+
           ## [9.9.9] - 2026-01-01
 
           Before the fence.
@@ -179,6 +189,10 @@ jobs:
           done
           if printf '%s\n' "$notes" | grep -qF 'The older entry'; then
             echo "::error::the section ran past its own end into the next entry"
+            exit 1
+          fi
+          if printf '%s\n' "$notes" | grep -qF 'must not be mistaken'; then
+            echo "::error::the section opened at a heading quoted inside a fence"
             exit 1
           fi
 
