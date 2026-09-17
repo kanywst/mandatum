@@ -61,48 +61,33 @@ base="https://github.com/${repository}/blob/${tag}/"
 # the one that opened it, which is what CommonMark says and what a toggle
 # flipping on either character gets wrong: a tilde block quoting a backtick
 # block would end at the inner example.
-section=$(awk -v heading="## [${version}]" '
-  index($0, heading) == 1 { inside = 1; next }
-  inside && !fenced && match($0, /^[[:space:]]*(`{3,}|~{3,})/) {
-    marker = substr($0, RSTART, RLENGTH)
-    sub(/^[[:space:]]*/, "", marker)
-    fence_char = substr(marker, 1, 1)
-    fence_len = length(marker)
-    fenced = 1
-    print; next
-  }
-  inside && fenced {
-    if (match($0, /^[[:space:]]*(`{3,}|~{3,})[[:space:]]*$/)) {
-      closer = substr($0, RSTART, RLENGTH)
-      gsub(/[[:space:]]/, "", closer)
-      if (substr(closer, 1, 1) == fence_char && length(closer) >= fence_len) { fenced = 0 }
+# One pass, because the fence state machine belongs to one program. It was
+# two — an extractor and a link rewriter, each tracking fences — and both
+# copies had to be corrected together twice, which is the argument against
+# having two.
+resolved=$(awk -v heading="## [${version}]" -v base="$base" '
+  # Absolute URLs, anchors and mail links are left alone; everything else is
+  # resolved against the tag.
+  function rewrite(line,   out, before, token, target) {
+    out = ""
+    while (match(line, /\]\([^)]*\)/)) {
+      before = substr(line, 1, RSTART - 1)
+      token = substr(line, RSTART, RLENGTH)
+      target = substr(token, 3, RLENGTH - 3)
+      if (target ~ /^https?:\/\// || target ~ /^#/ || target ~ /^mailto:/) {
+        out = out before token
+      } else {
+        out = out before "](" base target ")"
+      }
+      line = substr(line, RSTART + RLENGTH)
     }
-    print; next
+    return out line
   }
-  inside && /^## / { exit }
-  inside && /^\[[^]]+\]:[[:space:]]*[^[:space:]]/ { exit }
-  inside { print }
-  END { if (fenced) { exit 3 } }
-' "$changelog") || {
-  status=$?
-  if [ "$status" -eq 3 ]; then
-    echo "$0: the ${version} entry opens a code fence it never closes" >&2
-    exit 1
-  fi
-  exit "$status"
-}
 
-if [ -z "${section//[[:space:]]/}" ]; then
-  echo "$0: $changelog has no entry for ${version}." >&2
-  echo "A release nobody wrote down is a release nobody can audit." >&2
-  exit 1
-fi
+  index($0, heading) == 1 { inside = 1; next }
+  ! inside { next }
 
-# Rewrite relative Markdown links. Absolute URLs, anchors and mail links are
-# left alone, and fenced code blocks are skipped: a JSON example containing
-# the same two characters is not a link.
-resolved=$(printf '%s\n' "$section" | awk -v base="$base" '
-  !fenced && match($0, /^[[:space:]]*(`{3,}|~{3,})/) {
+  ! fenced && match($0, /^[[:space:]]*(`{3,}|~{3,})/) {
     marker = substr($0, RSTART, RLENGTH)
     sub(/^[[:space:]]*/, "", marker)
     fence_char = substr(marker, 1, 1)
@@ -118,23 +103,27 @@ resolved=$(printf '%s\n' "$section" | awk -v base="$base" '
     }
     print; next
   }
-  {
-    line = $0
-    out = ""
-    while (match(line, /\]\([^)]*\)/)) {
-      before = substr(line, 1, RSTART - 1)
-      token = substr(line, RSTART, RLENGTH)
-      target = substr(token, 3, RLENGTH - 3)
-      if (target ~ /^https?:\/\// || target ~ /^#/ || target ~ /^mailto:/) {
-        out = out before token
-      } else {
-        out = out before "](" base target ")"
-      }
-      line = substr(line, RSTART + RLENGTH)
-    }
-    print out line
-  }
-')
+
+  /^## / { exit }
+  /^\[[^]]+\]:[[:space:]]*[^[:space:]]/ { exit }
+
+  { print rewrite($0) }
+
+  END { if (fenced) { exit 3 } }
+' "$changelog") || {
+  status=$?
+  if [ "$status" -eq 3 ]; then
+    echo "$0: the ${version} entry opens a code fence it never closes" >&2
+    exit 1
+  fi
+  exit "$status"
+}
+
+if [ -z "${resolved//[[:space:]]/}" ]; then
+  echo "$0: $changelog has no entry for ${version}." >&2
+  echo "A release nobody wrote down is a release nobody can audit." >&2
+  exit 1
+fi
 
 # Trim the blank lines the section boundaries leave behind.
 resolved=$(printf '%s\n' "$resolved" | sed -e '/./,$!d' | awk '
