@@ -150,6 +150,12 @@ jobs:
           [^1]: a footnote definition inside an example
           ```
 
+          Between the fences.
+
+          ~~~markdown
+          ## [0.0.2] - a heading inside a tilde fence
+          ~~~
+
           After the fence.
 
           ## [9.9.8] - 2026-01-01
@@ -161,7 +167,7 @@ jobs:
 
           notes=$(CHANGELOG_FILE="${fixture}/CHANGELOG.md" ./hack/release-notes.sh 9.9.9)
 
-          for needle in 'Before the fence.' 'After the fence.'; do
+          for needle in 'Before the fence.' 'Between the fences.' 'After the fence.'; do
             if ! printf '%s\n' "$notes" | grep -qF "$needle"; then
               echo "::error::the section was truncated at a boundary inside a code fence"
               exit 1
@@ -171,7 +177,23 @@ jobs:
             echo "::error::the section ran past its own end into the next entry"
             exit 1
           fi
-          echo "ok: a fenced boundary is content"
+
+          # A fence that never closes would otherwise swallow the rest of the
+          # file in silence, since every boundary below it is inside a fence.
+          cat > "${fixture}/unclosed.md" <<'FIXTURE'
+          # Changelog
+
+          ## [9.9.9] - 2026-01-01
+
+          ```json
+          {"never": "closed"}
+          FIXTURE
+          if CHANGELOG_FILE="${fixture}/unclosed.md" ./hack/release-notes.sh 9.9.9 > /dev/null 2>&1; then
+            echo "::error::an entry with an unclosed code fence was accepted"
+            exit 1
+          fi
+
+          echo "ok: a fenced boundary is content, and an unclosed fence is an error"
 
       - name: documents do not reference documents that do not exist
         # A sentence in the present tense about a file nobody has written is

@@ -55,7 +55,7 @@ base="https://github.com/${repository}/blob/${tag}/"
 # the output looks like a shorter entry rather than a wrong one.
 section=$(awk -v heading="## [${version}]" '
   index($0, heading) == 1 { inside = 1; next }
-  inside && /^[[:space:]]*```/ { fenced = !fenced; print; next }
+  inside && /^[[:space:]]*(```|~~~)/ { fenced = !fenced; print; next }
   inside && fenced { print; next }
   inside && /^## / { exit }
   inside && /^\[[^]]+\]:[[:space:]]/ { exit }
@@ -80,7 +80,7 @@ fi
 # left alone, and fenced code blocks are skipped: a JSON example containing
 # the same two characters is not a link.
 resolved=$(printf '%s\n' "$section" | awk -v base="$base" '
-  /^[[:space:]]*```/ { fenced = !fenced; print; next }
+  /^[[:space:]]*(```|~~~)/ { fenced = !fenced; print; next }
   fenced { print; next }
   {
     line = $0
@@ -110,22 +110,32 @@ resolved=$(printf '%s\n' "$resolved" | sed -e '/./,$!d' | awk '
   }
 ')
 
-cat <<EOF
-${resolved}
+# Printed rather than interpolated. The template is full of backticks and
+# the notes carry whatever the changelog says, so an unquoted heredoc would
+# put both one editing slip from being executed. Bash does not re-scan the
+# result of a parameter expansion, so the changelog's own `$(...)` is inert
+# either way — but the template's is not, and this removes the question.
+printf '%s\n\n' "$resolved"
 
+cat <<'FIXED'
 ## Verifying this release
 
-\`\`\`bash
-cosign verify-blob \\
-  --bundle checksums.txt.bundle \\
-  --certificate-identity-regexp 'https://github.com/${repository}/.github/workflows/release.yml@.*' \\
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com \\
+```bash
+cosign verify-blob \
+  --bundle checksums.txt.bundle \
+FIXED
+
+printf "  --certificate-identity-regexp 'https://github.com/%s/.github/workflows/release.yml@.*' \\\\\n" "$repository"
+
+cat <<'FIXED'
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   checksums.txt
 
 sha256sum -c checksums.txt
-\`\`\`
+```
 
-An SPDX SBOM is attached. Build provenance is attested and can be checked with \`gh attestation verify\`.
+An SPDX SBOM is attached. Build provenance is attested and can be checked with `gh attestation verify`.
 
-The full changelog, including which Delegation Assertion format versions every release accepts and issues, is in [CHANGELOG.md](${base}CHANGELOG.md).
-EOF
+FIXED
+
+printf 'The full changelog, including which Delegation Assertion format versions every release accepts and issues, is in [CHANGELOG.md](%sCHANGELOG.md).\n' "$base"
