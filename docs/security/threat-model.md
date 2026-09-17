@@ -1,6 +1,6 @@
 # Threat model
 
-Last updated: 2026-09-13. Covers the Delegation Assertion format, the verifier, the signing layer, the AuthZEN binding and sequence evaluation, at the state described in [CHANGELOG.md](../../CHANGELOG.md).
+Last reconciled with the implementation: 2026-09-17. That is when what follows was last checked against the code, which is the claim a reader needs from a threat model and the one that goes stale without anything looking wrong; `git log` holds the edit history. Covers the Delegation Assertion format, the verifier, the signing layer, the AuthZEN binding, sequence evaluation, revocation sets and the MCP enforcement point, at the state described in [CHANGELOG.md](../../CHANGELOG.md).
 
 The specification carries a summary table in section 11. This is the full version: what is being defended, from whom, what is assumed rather than enforced, and what is knowingly not covered.
 
@@ -93,7 +93,13 @@ An attacker with write access edits or removes audit records. Answered by an RFC
 
 Malformed input at the enforcement point. Parsing and chain verification are fuzzed continuously; a panic there would deny every protected call, so it is treated as a security defect rather than a robustness one. Chain length is bounded by the sponsor's depth budget, and sequence state is fixed-size by construction, so neither grows with attacker input.
 
+A panic is not the only shape this takes, and assuming it was is how the one instance of this got shipped. A published revocation set declares how many hash positions a lookup checks, and that number had no upper bound: eighty bytes declaring *k* in the billions made a single `MayContain` take three seconds and ask for fourteen gigabytes, on the path of every authorized action. No crash, no malformed input in the parser's sense — a well-formed document whose declared parameters chose the cost of enforcement. §7.1 now bounds *k* at 64 and `revoke.ParseSet` refuses a set outside it, with the refusal made before anything proportional to the declared value. The general rule it came from: a number in an input that a loop runs on is a bound the input's author gets to pick, and every such number in the wire format needs one of ours.
+
+That defect was found by a fuzz campaign against `pkg/revoke`, a target which sat in the repository for twenty-one hours without being in the nightly matrix — from the commit that added it to the commit that fixed the matrix — and which produced a crasher one hour and fifty minutes into the first campaign that ran it. The lesson recorded here is not about the bound but about the coverage: a fuzz target nothing runs is a test suite entry that reads as assurance, and the interval that matters is not how long it went unrun but how short the run was that found something.
+
 Residual: signature verification costs one Ed25519 check per link. A verifier facing untrusted volume needs rate limiting above it, which this project does not provide.
+
+Residual: the bounds are on what a document may declare, not on how often it may be presented. A caller that presents the longest permitted chain, with the largest permitted capability set, as fast as it can still costs more than a caller that does not.
 
 ## Not yet covered
 
@@ -104,7 +110,7 @@ Listed because a threat model that only describes finished work is a marketing d
 | No replicated sequence store | The shipped store is in-process. A deployment with more than one enforcement point has no sequence constraints, whatever its assertions declare. |
 | Sequence rules depend on resource tags nothing verifies | An untagged mutating tool is unconstrained. The trust boundary here is whoever tags the tools. |
 | No audit log | There is no tamper-evident record. The attribution the format establishes is not yet written anywhere durable, and §10 of the specification describes something that does not exist. |
-| No revocation distribution | `RevocationChecker` is an interface with no production implementation. |
+| No revocation publisher | `pkg/revoke` builds, publishes and evaluates the compact set of §7.1, so a PEP answers V8 locally. What no code here does is republish one on a schedule or serve it, so a deployment supplies both. A set that stops being republished eventually denies everything rather than quietly enforcing nothing, which is the right failure and still an outage. |
 | Untested against a real PDP | The AuthZEN client is exercised against test servers covering each failure mode, not against any implementation somebody else wrote. |
 | No third-party review | Everything here is the authors' own analysis of their own design. Treat it accordingly. |
 | Key compromise is undetectable | No monitoring, no transparency log for issued assertions. |
