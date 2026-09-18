@@ -108,6 +108,151 @@ jobs:
           fail: true
         continue-on-error: true
 
+      - name: release notes build for every changelog entry
+        # Every entry, not just the one a tag is about, because the boundary
+        # a section extractor gets wrong is the last one: the oldest entry
+        # has no heading below it and runs into the file's link definitions.
+        # That is the entry a project's first release publishes, and the
+        # only one never exercised until it matters.
+        run: |
+          set -euo pipefail
+          grep -oE '^## \[[^]]+\]' CHANGELOG.md |
+            sed -E 's/^## \[//; s/\]$//' |
+            grep -v '^Unreleased$' |
+            while IFS= read -r version; do
+              notes=$(./hack/release-notes.sh "$version")
+              if printf '%s\n' "$notes" | grep -qE '^\[[^]]+\]:[[:space:]]'; then
+                echo "::error::the notes for ${version} carry the changelog's link definitions"
+                exit 1
+              fi
+              echo "ok: ${version}"
+            done
+
+      - name: a section boundary inside a code fence is not a boundary
+        # The check above cannot catch this one. A boundary matched inside a
+        # fence truncates the section, which *removes* the offending line
+        # rather than leaking it, so the output is a short entry rather than
+        # a wrong one and nothing fails. This changelog quotes JSON claim
+        # sets and JWS payloads, so a fence holding a line that starts `## `
+        # is a question of when, not whether.
+        run: |
+          set -euo pipefail
+          fixture=$(mktemp -d)
+          cat > "${fixture}/CHANGELOG.md" <<'FIXTURE'
+          # Changelog
+
+          ## [Unreleased]
+
+          An entry that quotes the entry below it:
+
+          ```markdown
+          ## [9.9.9] - 2026-01-01
+
+          The quotation, which must not be mistaken for the entry.
+          ```
+
+          ## [9.9.9] - 2026-01-01
+
+          Before the fence.
+
+          ```markdown
+          ## [0.0.1] - a heading inside an example
+          [^1]: a footnote definition inside an example
+          ```
+
+          Between the fences.
+
+          ~~~markdown
+          ## [0.0.2] - a heading inside a tilde fence
+          ```
+          ## [0.0.3] - a heading inside a fence inside a fence
+          ```
+          ~~~
+
+          After the fence.
+
+          ## [9.9.8] - 2026-01-01
+
+          The older entry, which must not appear.
+
+          [9.9.9]: https://example.com/9.9.9
+          [9.9.8]:https://example.com/9.9.8
+          FIXTURE
+
+          notes=$(CHANGELOG_FILE="${fixture}/CHANGELOG.md" ./hack/release-notes.sh 9.9.9)
+
+          for needle in 'Before the fence.' 'Between the fences.' 'After the fence.'; do
+            if ! printf '%s\n' "$notes" | grep -qF "$needle"; then
+              echo "::error::the section was truncated at a boundary inside a code fence"
+              exit 1
+            fi
+          done
+          if printf '%s\n' "$notes" | grep -qF 'The older entry'; then
+            echo "::error::the section ran past its own end into the next entry"
+            exit 1
+          fi
+          if printf '%s\n' "$notes" | grep -qF 'must not be mistaken'; then
+            echo "::error::the section opened at a heading quoted inside a fence"
+            exit 1
+          fi
+
+          # A fence that never closes would otherwise swallow the rest of the
+          # file in silence, since every boundary below it is inside a fence.
+          cat > "${fixture}/unclosed.md" <<'FIXTURE'
+          # Changelog
+
+          ## [9.9.9] - 2026-01-01
+
+          ```json
+          {"never": "closed"}
+          FIXTURE
+          if CHANGELOG_FILE="${fixture}/unclosed.md" ./hack/release-notes.sh 9.9.9 > /dev/null 2>&1; then
+            echo "::error::an entry with an unclosed code fence was accepted"
+            exit 1
+          fi
+
+          # A link target may contain balanced parentheses, a reference-style
+          # link would arrive without its definition, and a version heading
+          # written twice is a boundary rather than a second start.
+          cat > "${fixture}/shapes.md" <<'FIXTURE'
+          # Changelog
+
+          ## [9.9.9] - 2026-01-01
+
+          See [details](docs/Foo_(bar).md).
+
+          ## [9.9.9] - 2026-01-01
+
+          The duplicate heading, which must not be appended.
+
+          [9.9.9]: https://example.com/9.9.9
+          FIXTURE
+          notes=$(CHANGELOG_FILE="${fixture}/shapes.md" ./hack/release-notes.sh 9.9.9)
+          if ! printf '%s\n' "$notes" | grep -qF 'blob/v9.9.9/docs/Foo_(bar).md'; then
+            echo "::error::a link target containing parentheses was truncated"
+            exit 1
+          fi
+          if printf '%s\n' "$notes" | grep -qF 'must not be appended'; then
+            echo "::error::a repeated version heading restarted the section instead of ending it"
+            exit 1
+          fi
+
+          cat > "${fixture}/reference.md" <<'FIXTURE'
+          # Changelog
+
+          ## [9.9.9] - 2026-01-01
+
+          See [the roadmap][rm].
+
+          [rm]: https://example.com/roadmap
+          FIXTURE
+          if CHANGELOG_FILE="${fixture}/reference.md" ./hack/release-notes.sh 9.9.9 > /dev/null 2>&1; then
+            echo "::error::a reference-style link was accepted; its definition is not in the notes"
+            exit 1
+          fi
+
+          echo "ok: a fenced boundary is content, and an unclosed fence is an error"
+
       - name: documents do not reference documents that do not exist
         # A sentence in the present tense about a file nobody has written is
         # the same defect as a claim the code does not honour, and it has
