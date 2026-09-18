@@ -35,7 +35,7 @@ Mandatum deliberately implements other people's standards rather than inventing 
 
 ## Engineering track
 
-### v0.1 — Specification and verifier (2026 Q4)
+### v0.1 — Specification and verifier (2026 Q4) — shipped 2026-09-18
 
 The verifier is the security core. It ships first, alone, so that it can be reviewed and attacked before anything depends on it.
 
@@ -45,7 +45,7 @@ The verifier is the security core. It ships first, alone, so that it can be revi
 - Continuous fuzzing of parsing and verification
 - A negative-test corpus: every rule in the specification has a test that proves a chain violating it is rejected
 
-Gates: every specification rule has a corresponding negative test; the threat model is published; and each fuzz target has accumulated at least 24 hours with no crasher. Cumulative, because a single run cannot: a GitHub Actions job is capped at six hours, so the gate is met by the nightly campaign plus a long `workflow_dispatch` run per target before the tag, and the total is recorded in the release notes rather than asserted here.
+Gates: every specification rule has a corresponding negative test; the threat model is published; and each fuzz target has accumulated at least 24 hours with no crasher. Cumulative, because a single run cannot: a GitHub Actions job is capped at six hours, so the gate is met by the nightly campaign plus long `workflow_dispatch` runs before the tag, and the total is recorded in the release notes rather than asserted here. All three were met at v0.1.0, with the hours and the shape of them in [CHANGELOG.md](CHANGELOG.md).
 
 ### v0.2 — AuthZEN and MCP binding (2027 Q1)
 
