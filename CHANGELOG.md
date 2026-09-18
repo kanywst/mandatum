@@ -6,6 +6,26 @@ Each release also records which Delegation Assertion format versions (`mdt.v`) i
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.1.0] - 2026-09-18
+
+The first release with a version number rather than a pre-release identifier. Nothing in it is new since `main`; what changed is that the v0.1 gates in [ROADMAP.md](ROADMAP.md) are met, and gates are what decides when a version ships here.
+
+Wire format: accepts `mdt.v` 1, issues `mdt.v` 1. Unchanged from rc.1 and rc.2.
+
+Per [VERSIONING.md](VERSIONING.md) this is a 0.x release: the Go API may change in any minor release before v1.0.0, and each such change will be recorded here with its migration. The wire format is versioned separately and is not covered by that.
+
+### The gates, and how they were met
+
+- **Every rule in the specification has a negative test.** V1 through V9 each have a test proving a chain that violates them is rejected, as does §6 rule 7, the audience rule that stops a chain being re-targeted.
+- **The threat model is published.** [`docs/security/threat-model.md`](docs/security/threat-model.md), including what is assumed rather than enforced, and what is not covered at all.
+- **Each fuzz target has accumulated at least 24 hours with no crasher.** Twenty-five hours each for `FuzzClaimsValidate`, `FuzzVerify`, `FuzzParse` and `FuzzParseSet`, all of it over the tree this tag names.
+
+That total is accumulated wall-clock rather than one long run, which is what the gate asks for and is worth being precise about. A GitHub Actions job is capped at six hours, so the twenty-five hours per target are five concurrent five-hour campaigns. Concurrent campaigns do not share a corpus, so twenty-five hours arranged this way explores less than twenty-five consecutive hours would. The gate is written in accumulated hours and this meets it; the difference is recorded here rather than left for somebody to work out later.
+
+The first attempt at this release did not get that far. A campaign found a crasher in `pkg/revoke` an hour and fifty minutes in, the hours before it stopped counting, and the release waited for the fix and a fresh set of campaigns. That is the gate working: the same release cut a day earlier would have shipped the defect.
+
 ### Changed
 
 - The release notes are the tag's changelog entry, rather than a fixed page saying to go and read it. `hack/release-notes.sh` extracts the section for a version, rewrites its relative links to absolute ones pinned at the tag — a release page is read outside the repository, and a link resolving against whatever `main` says today points at a document that has moved on from the release it describes — and appends the verification instructions. The release workflow runs it twice: once in the verify job for its exit status, so a tag with no entry fails before anything is published, and once to write the notes. That replaces the `grep` that checked the same thing beside the step that needed it. It also makes three sentences in `VERSIONING.md` true that were not: the notes now do record which `mdt.v` values a release accepts and issues, and a deprecation or a compatibility break named in the changelog now reaches the page people actually read.
@@ -45,6 +65,18 @@ Each release also records which Delegation Assertion format versions (`mdt.v`) i
 - The documents described RFC 8693 as silent on what a resource server should do with a delegation chain. It is not: §4.1 requires a consumer to consider only the current actor and treats prior actors in nested `act` claims as informational. Corrected in the specification, the alternatives analysis and both READMEs, along with the consequence, which is that authorizing on a delegation history at the resource server is an extension of the RFC 8693 model rather than a gap in it. This project is that extension, not a reinterpretation of `act`. Corrected by @arjun2075 in openid/authzen#612.
 - The specification's AuthZEN example now matches the COAZ-MCP binding: the human sponsor is `subject`, the acting agent is `context.agent`, and the rest of the chain sits under a vendor-prefixed context key because the binding leaves upstream actors undefined rather than forbidding them. The previous example invented `subject.type: "agent"` and `resource.type: "mcp_tool"`, which is exactly the parallel mapping the non-goals say not to define.
 - The Japanese specification and README caught up with changes made to the English originals after they were translated. The drift check only runs on pull requests, and those changes went straight to `main`.
+
+### Known limitations
+
+A version number is not a claim that everything the documents describe works. These are the parts that do not, and a deployment should read them before depending on this.
+
+- **No audit log.** §10 of the specification describes a tamper-evident record, and nothing writes one. The attribution a verified chain establishes is not persisted anywhere durable by this project.
+- **The sequence store is in-process only.** A deployment running more than one enforcement point has no sequence constraints at all, whatever its assertions declare, because neither point sees the other's history. `sequence.Store` is the interface a replicated one would implement; there is no implementation of it here.
+- **Nothing publishes a revocation set on a schedule.** `pkg/revoke` builds and reads the compact set of §7.1; the service that republishes it, and the transport that delivers it, are not in this release. A checker refuses a set older than its maximum age, so a publisher that stops publishing eventually denies everything rather than quietly enforcing nothing — and that denial is an outage.
+- **No third-party security review.** Everything here is the authors' analysis of their own design.
+- **Only `tools/call` is mapped to AuthZEN.** `pkg/mcp` forwards every other MCP method to the server it fronts, which diverges from the COAZ-MCP binding's requirement that a method with no mapping be denied. It is a per-call layer above MCP's own transport authorization, not a replacement for it. The binding's declared mappings and CEL expressions are not read either. See [`docs/spec/coaz-mcp-conformance.md`](docs/spec/coaz-mcp-conformance.md).
+- **Untested against a real PDP.** The AuthZEN client is exercised against test servers covering each failure mode, not against any implementation somebody else wrote. The three-vendor interoperability test is a v0.2 gate.
+- **Rule V7 is not reachable through the public API.** V5 and the structural `max_depth` invariant reject anything that would violate it first. It is retained as defence in depth against a later relaxation of V5, and tested directly.
 
 ## [0.1.0-rc.2] - 2026-09-12
 
@@ -89,6 +121,7 @@ Wire format: accepts `mdt.v` 1, issues `mdt.v` 1.
 - No audit log.
 - Rule V7 is not reachable through the public API. V5 and the structural `max_depth` invariant reject anything that would violate it first. It is retained as defence in depth and tested directly.
 
-[Unreleased]: https://github.com/kanywst/mandatum/compare/v0.1.0-rc.2...HEAD
+[Unreleased]: https://github.com/kanywst/mandatum/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/kanywst/mandatum/releases/tag/v0.1.0
 [0.1.0-rc.2]: https://github.com/kanywst/mandatum/releases/tag/v0.1.0-rc.2
 [0.1.0-rc.1]: https://github.com/kanywst/mandatum/releases/tag/v0.1.0-rc.1
