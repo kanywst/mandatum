@@ -10,6 +10,8 @@ Adding a dependency requires justification in the pull request. Its license must
 
 Signature verification and revocation lookup are interfaces precisely so that a JOSE implementation, which is a real dependency with real surface area, sits outside the part that must be audited most closely.
 
+The module has one direct dependency, [CEL](https://github.com/google/cel-go) (`cel.dev/cel-go`, Apache-2.0), and it is imported by `pkg/authzen` alone. The COAZ-MCP binding writes every mapping, the default ones included, in CEL and states that there is no expression-free conformance level, so reading a tool's declared mapping means evaluating CEL. Writing a second CEL implementation would put more unreviewed parser in the module rather than less. What keeps it out of the verification core is the import graph, and it can be checked: `go list -deps -f '{{if not .Standard}}{{.ImportPath}}{{end}}' ./pkg/verify` lists only this module's own packages, and the same holds for `pkg/mda`, `pkg/jose`, `pkg/issue`, `pkg/revoke` and `pkg/sequence`. A declared mapping's expressions are written by the server being authorized, so they run under a cost limit; see [the conformance notes](../spec/coaz-mcp-conformance.md).
+
 ## What every release carries
 
 | Artifact | Purpose |

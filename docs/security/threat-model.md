@@ -27,6 +27,7 @@ Everything below is about ways that sentence could be false.
 - **A network attacker** who can read, drop, delay and replay traffic, but holds no key.
 - **A compromised agent** that legitimately holds a chain and its own signing key, and wants more authority than it was given. This is the actor the format exists for.
 - **A compromised PDP** that answers evaluation requests dishonestly.
+- **A dishonest MCP server** that declares the mapping its own tool calls are authorized by, and writes it to get a better answer.
 - **A malicious issuer** — an agent that delegates, acting against a sub-agent or against the sponsor.
 - **A curious insider** who can read stored assertions and logs.
 
@@ -74,6 +75,14 @@ Residual: revocation is only as fresh as its distribution. A chain revoked one s
 A chain issued for one resource server is presented to another, or an agent's broad connectivity substitutes for its caller's narrower authority. Answered by §6 rule 7, which fixes the audience for the whole chain, by V9, which compares the leaf's audience to the verifier, and by V2 (a delegator may only delegate what it holds, so the chain records which principal actually caused the action rather than only which one presented it).
 
 V9 alone was not enough, and for a while that is all there was. An agent holding a valid chain could sign a further link naming a different resource server — same capabilities, itself as delegator, so every other rule held — and present it there, where V9 compared the leaf's audience against that server and passed. Rule 7 is what closes it; without it the audience is chosen by whoever issues the leaf, which in this threat is the compromised agent.
+
+### A server writing its own question
+
+The COAZ-MCP binding lets an MCP server declare, per tool, how a call is turned into an evaluation request. The server is the party being authorized, so a declared mapping is a request it drafts about itself: it could name a different subject, claim a different agent, forge the delegation object, or ask about something harmless while the call does something else.
+
+Answered in `pkg/authzen`, where the request is resolved. The sponsor in `subject.id`, the sponsor's issuer, the acting agent in `context.agent` and the verified chain under `mandatum.delegation` all come from verification. A mapping may leave them out and have them supplied. If it sets any of them to something else, the call is refused before the PDP is asked. The binding allows a mapping to override `subject.id`; Mandatum does not. The chain's own grant is checked before the mapping is resolved, against the deployment's catalog rather than anything the mapping says, so asking a harmless question gets the server a harmless answer and nothing it was not already granted. Expressions run under a cost limit, and what they produce for one call under a size limit, because they are the server's code running on the enforcement point and the cost limit alone does not bound the size of a result. A key that is not a pinned one but folds to it under case-insensitive matching is refused, so a PDP that decodes JSON that way cannot be handed a twin of the sponsor's issuer.
+
+What is not answered is the question itself. A mapping that projects the wrong argument, or none, gets a decision about a request that does not describe the call, and the binding is explicit that a decision covers only what the mapping projected. Whether a mapping asks the right question is a property of the mapping, and a deployment that takes mappings from servers it does not trust is trusting them with that.
 
 ### Sequence evasion
 
@@ -125,6 +134,7 @@ Listed because a threat model that only describes finished work is a marketing d
 - If keys are fetched rather than pinned, the cache TTL is short enough. A key removed from an issuer's document stays usable at a verifier until its copy expires, so the TTL is the window in which a retired key still verifies. The default is five minutes; a deployment that sets it long has chosen that window.
 - If revocation is evaluated from a compact set, something publishes a new one. The set records when it was built and the checker refuses to answer from one older than its maximum age, so a publisher that stops publishing eventually denies everything rather than quietly enforcing nothing — but the denial is an outage, and nothing in this repository schedules the publishing.
 - Every enforcement point calls `Result.Permits` for the request it is about to perform, and treats its failure as a denial. Verification says who delegated what; only this call says the thing being asked for is inside it. A deployment that skips it inherits assumption 6's failure mode in full. `pkg/mcp.Enforcer` makes the call for MCP tool calls, so a deployment behind it is checking this; the assumption is one a deployment wiring the packages together itself has to check.
+- A declared mapping projects every input that authorization is meant to depend on. `pkg/mcp` uses a mapping only when the deployment's catalog returns one, so where mappings come from is the deployment's choice; a deployment that takes them from the servers it fronts is trusting those servers to ask the PDP the right question.
 - The tags a deployment attaches to its tools describe what those tools do. `pkg/mcp` refuses a tool its catalog does not describe, which stops an unknown tool from satisfying every tag-matching constraint written to stop it — but a tool tagged wrongly is worse than one tagged not at all, and nothing here can check a tag against what the tool actually does.
 
 ## Reporting

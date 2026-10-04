@@ -69,8 +69,7 @@ func WithLogger(l *slog.Logger) Option {
 //
 // Requests for other methods are forwarded unexamined. That is a statement
 // of scope rather than a gap: `tools/call` is the only way to invoke a tool,
-// it is the only method the COAZ-MCP binding's default mapping is
-// implemented for here (see docs/spec/coaz-mcp-conformance.md), and a
+// it is the only method the COAZ-MCP binding is implemented for here (see docs/spec/coaz-mcp-conformance.md), and a
 // delegation chain says nothing about `tools/list` or `initialize`. What it
 // does mean is that this middleware is not a substitute for MCP's own
 // authorization on the transport; it is the per-call layer above it.

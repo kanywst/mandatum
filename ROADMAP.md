@@ -1,6 +1,6 @@
 # Roadmap
 
-Last reconciled with the implementation: 2026-09-16.
+Last reconciled with the implementation: 2026-10-04.
 
 That date is a claim about when every Status below was last checked against the code, which is the thing a reader needs and the thing that can go stale silently. It is not a record of when this file was last edited: `git log ROADMAP.md` already holds that, and the line this replaces tried to be both — it said 2026-09-13 through two later commits that changed the gates it sits above.
 
@@ -53,7 +53,7 @@ Gates: every specification rule has a corresponding negative test; the threat mo
 - ~~Mapping from a verified chain to an evaluation request~~ done
 - ~~Conformance against the COAZ-MCP working group draft, with divergences documented rather than hidden~~ done, for the `tools/call` default mapping only
 - ~~MCP tool-call enforcement middleware~~ done: `pkg/mcp` runs the four checks of §8 in order and refuses on any of them. It enforces `tools/call` and forwards every other method, which is a documented divergence from the binding's deny-by-default over unmapped methods rather than a gap left open
-- Declared mappings and CEL, which the binding defines and this does not read
+- ~~Declared mappings and CEL~~ done, for `tools/call`: `authzen.ParseMapping` reads a tool's `x-authzen-mapping`, both envelopes, with the subject and agent pinned to the verified chain. A deployment supplies mappings through its catalog; the middleware does not learn them from `tools/list` responses, which is the binding's gateway shape and is recorded as not implemented
 - Interoperability tested against at least three independent PDP implementations
 
 Gates: works against three PDPs from different vendors with no implementation-specific code paths.
