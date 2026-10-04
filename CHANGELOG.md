@@ -82,6 +82,8 @@ A version number is not a claim that everything the documents describe works. Th
 
 A pre-release, on the same terms as rc.1: no compatibility promise, not supported.
 
+Its tag and release were deleted on 2026-09-18, after 0.1.0 shipped, so it can no longer be downloaded. The link below points at the commit the tag named, which is what the entry describes.
+
 Wire format: accepts `mdt.v` 1, issues `mdt.v` 1. Unchanged from rc.1 — this release exists only to fix the signing step, which is why rc.1 never published.
 
 ### Fixed
@@ -123,5 +125,5 @@ Wire format: accepts `mdt.v` 1, issues `mdt.v` 1.
 
 [Unreleased]: https://github.com/kanywst/mandatum/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/kanywst/mandatum/releases/tag/v0.1.0
-[0.1.0-rc.2]: https://github.com/kanywst/mandatum/releases/tag/v0.1.0-rc.2
+[0.1.0-rc.2]: https://github.com/kanywst/mandatum/tree/c4fc3d26a5e41990c04bb939a5a25d24651e88ac
 [0.1.0-rc.1]: https://github.com/kanywst/mandatum/releases/tag/v0.1.0-rc.1
