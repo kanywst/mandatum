@@ -7,7 +7,8 @@
 //
 //  1. verify the chain (§7, rules V1 through V9);
 //  2. check the chain's own capability set covers the call (§8, step 2);
-//  3. ask the Policy Decision Point (§8, step 3);
+//  3. ask the Policy Decision Point (§8, step 3), with the request the
+//     tool's declared mapping constructs if it has one;
 //  4. admit the action against the chain's history (§9).
 //
 // The call proceeds only if all four agree. Step 2 is the one a PEP is most
@@ -67,6 +68,13 @@ type Facts struct {
 	// argument named "index" look like an obvious pairing, and guessing at
 	// it is how a condition silently ends up matching the wrong value.
 	Attributes map[string]any
+	// Mapping is the tool's declared mapping, the `x-authzen-mapping` in
+	// its input schema, or nil for the COAZ-MCP default. It decides what
+	// the PDP is asked and nothing else: the chain's own grant is checked
+	// against Tags and Attributes whatever the mapping says, so a server
+	// that declares a mapping can change the question the PDP answers but
+	// not what the sponsor delegated.
+	Mapping *authzen.Mapping
 }
 
 // Catalog describes the tools a server exposes.
@@ -118,6 +126,10 @@ const (
 	StageCatalog Stage = "catalog"
 	// StagePermits is the chain's own capability set.
 	StagePermits Stage = "permits"
+	// StageMapping is the tool's declared mapping, which could not
+	// construct a request: an expression failed, or it named a subject or
+	// an agent the chain does not.
+	StageMapping Stage = "mapping"
 	// StagePolicy is the Policy Decision Point.
 	StagePolicy Stage = "policy"
 	// StageSequence is the chain's action history.
@@ -269,9 +281,12 @@ type Authorized struct {
 	// authority passed through, and the digest identifying it in an audit
 	// record.
 	Chain *verify.Result
-	// Decision is the PDP's answer, including whatever context it chose to
-	// explain itself with. It is always an allow — a deny is a *Refusal.
-	Decision authzen.Decision
+	// Decisions are the PDP's answers, one per evaluation request, in the
+	// order the mapping constructed them, including whatever context the
+	// PDP chose to explain itself with. There is one unless the tool
+	// declares an `evaluations` mapping. Every one is an allow — a deny is
+	// a *Refusal.
+	Decisions []authzen.Decision
 }
 
 // Authorize runs the four checks in order and returns nil only if all agree.
@@ -314,16 +329,24 @@ func (e *Enforcer) Authorize(ctx context.Context, call Call) (*Authorized, error
 	// 3. Organizational policy, on top of what the sponsor delegated. The
 	//    PDP can narrow what the chain allows and cannot widen it, because
 	//    step 2 already ran and refused anything outside the grant.
-	decision, err := e.pdp.Evaluate(ctx, authzen.ToolCallRequest(verified, authzen.ToolCall{
-		Name:      call.Tool,
-		Arguments: call.Arguments,
-		Server:    e.server,
-	}))
-	if err != nil {
-		return nil, &Refusal{Stage: StagePolicy, Err: err}
+	toolCall := authzen.ToolCall{Name: call.Tool, Arguments: call.Arguments, Server: e.server}
+	requests := []authzen.Request{authzen.ToolCallRequest(verified, toolCall)}
+	if facts.Mapping != nil {
+		if requests, err = facts.Mapping.ToolCallRequests(ctx, verified, toolCall); err != nil {
+			return nil, &Refusal{Stage: StageMapping, Err: err}
+		}
 	}
-	if !decision.Allowed {
-		return nil, &Refusal{Stage: StagePolicy, Err: errors.New("the policy decision point denied this call")}
+	decisions := make([]authzen.Decision, 0, len(requests))
+	for i, request := range requests {
+		decision, err := e.pdp.Evaluate(ctx, request)
+		if err != nil {
+			return nil, &Refusal{Stage: StagePolicy, Err: err}
+		}
+		if !decision.Allowed {
+			return nil, &Refusal{Stage: StagePolicy, Err: fmt.Errorf(
+				"the policy decision point denied evaluation %d of %d for this call", i+1, len(requests))}
+		}
+		decisions = append(decisions, decision)
 	}
 
 	// 4. The history, which is the part no per-call check can do. Last,
@@ -336,5 +359,5 @@ func (e *Enforcer) Authorize(ctx context.Context, call Call) (*Authorized, error
 		return nil, &Refusal{Stage: StageSequence, Err: err}
 	}
 
-	return &Authorized{Chain: verified, Decision: decision}, nil
+	return &Authorized{Chain: verified, Decisions: decisions}, nil
 }

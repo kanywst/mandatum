@@ -6,7 +6,22 @@ Each release also records which Delegation Assertion format versions (`mdt.v`) i
 
 ## [Unreleased]
 
-Nothing yet.
+Wire format: accepts `mdt.v` 1, issues `mdt.v` 1. Unchanged.
+
+### Added
+
+- Declared mappings for `tools/call`, the COAZ-MCP binding's `x-authzen-mapping`. `authzen.ParseMapping` reads one and compiles its CEL up front, so a mapping that cannot work is refused when it is loaded rather than on the first call; `authzen.MappingFromInputSchema` finds one in a tool's `inputSchema`. A catalog returns it in `mcp.Facts.Mapping` and the enforcer asks the PDP what the mapping constructs instead of the default mapping. Both envelopes are supported: `evaluations` becomes one Access Evaluation request per entry, and the call is allowed only if every one is.
+- The identities in a declared mapping's request come from the chain, not the mapping. `subject.id` is the sponsor, `subject.properties.iss` the sponsor's issuer, `context.agent` the acting agent, and the verified chain is in `context["mandatum.delegation"]`; a mapping that sets any of them to something else is refused. The binding lets a mapping override `subject.id` for deployments that cannot carry the user in a token. A chain always carries the user, so here the override would only ever let the server being authorized say whose call it is. The divergence is in [the conformance notes](docs/spec/coaz-mcp-conformance.md).
+- A declared mapping changes the question the PDP is asked and nothing else. The chain's own grant is still checked first, against the deployment's description of the tool, so a server cannot declare its way past what the sponsor delegated; `TestADeclaredMappingCannotWidenTheGrant` asserts the PDP is not asked.
+- `mcp.StageMapping`, the stage that refuses a call whose mapping could not produce a request. It runs between the grant and the PDP, and the PDP is not asked.
+- Bounds on a mapping's expressions, which are written by the server being authorized and run on every call to its tool: a CEL cost limit, `authzen.MaxExpressionCost`, and a separate bound on what they produce for one call, `authzen.MaxResolvedValues` and `authzen.MaxResolvedBytes`. The second exists because the first does not cover it — CEL charges for referencing a list, not for its length, so an expression mapping one argument's list onto another's evaluated well under the cost limit while allocating tens of gigabytes. Found in review before merge; `TestAnAmplifyingExpressionIsStopped` is the case.
+- `FuzzDeclaredMapping`, which holds the anchoring above as an invariant over arbitrary mappings. The nightly campaign picks it up with the others.
+- The module's first dependency, CEL (`cel.dev/cel-go`). The binding has no expression-free conformance level. It is imported by `pkg/authzen` alone; the verification core still depends only on the standard library, and [the supply-chain notes](docs/security/supply-chain.md) say how to check that.
+
+### Changed
+
+- `mcp.Authorized.Decision` is now `Decisions`, one per evaluation the mapping constructed, in order. There is still exactly one unless the tool declares an `evaluations` mapping, so `Decisions[0]` is what `Decision` was.
+- The conformance notes record a divergence that was there before this change and was not written down: the middleware answers every refusal with code `403`, where the binding specifies `-32602`, `-32001` and `-32603` by kind.
 
 ## [0.1.0] - 2026-09-18
 

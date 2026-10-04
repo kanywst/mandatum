@@ -455,3 +455,153 @@ func TestCatalogFuncSuppliesConditionAttributes(t *testing.T) {
 		t.Errorf("refused at %q, want %q", stage, mcp.StagePermits)
 	}
 }
+
+// scripted answers each evaluation in turn and records every request.
+type scripted struct {
+	answers []bool
+	asked   []authzen.Request
+}
+
+func (s *scripted) Evaluate(_ context.Context, r authzen.Request) (authzen.Decision, error) {
+	s.asked = append(s.asked, r)
+	allow := s.answers[len(s.asked)-1]
+	return authzen.Decision{Allowed: allow}, nil
+}
+
+func mappedEnforcer(t *testing.T, w *world, decider mcp.Decider, mappings map[string]string) *mcp.Enforcer {
+	t.Helper()
+	parsed := map[string]*authzen.Mapping{}
+	for tool, raw := range mappings {
+		m, err := authzen.ParseMapping([]byte(raw))
+		if err != nil {
+			t.Fatal(err)
+		}
+		parsed[tool] = m
+	}
+	cat := mcp.CatalogFunc(func(tool string, args map[string]any) (mcp.Facts, error) {
+		facts, err := catalog.Describe(tool, args)
+		facts.Mapping = parsed[tool]
+		return facts, err
+	})
+	evaluator, err := sequence.NewEvaluator(sequence.NewMemoryStore())
+	if err != nil {
+		t.Fatal(err)
+	}
+	e, err := mcp.New(w.verifier(), cat, decider, evaluator, mcp.WithServer(audience))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return e
+}
+
+const queryMapping = `{"evaluation": {
+	"subject": { "type": "identity", "id": "$token.sub" },
+	"action": { "name": "query" },
+	"resource": { "type": "index", "id": "$params.arguments.index" },
+	"context": { "agent": "$token.?client_id" }
+}}`
+
+func TestADeclaredMappingDecidesWhatThePDPIsAsked(t *testing.T) {
+	w := newWorld(t)
+	decider := &pdp{allow: true}
+	e := mappedEnforcer(t, w, decider, map[string]string{"search.query": queryMapping})
+
+	_, err := e.Authorize(context.Background(), mcp.Call{
+		Chain:     w.chain(nil),
+		Tool:      "search.query",
+		Arguments: map[string]any{"index": "public"},
+	})
+	if err != nil {
+		t.Fatalf("expected an allow: %v", err)
+	}
+	r := decider.lastReq
+	if r.Action.Name != "query" || r.Resource.Type != "index" || r.Resource.ID != "public" {
+		t.Errorf("the PDP was asked %s on %s/%s, want the declared mapping's request", r.Action.Name, r.Resource.Type, r.Resource.ID)
+	}
+	if r.Subject.ID != w.spons.Subject || r.Context["agent"] != agentA {
+		t.Errorf("subject %q, agent %v: the identities are not the chain's", r.Subject.ID, r.Context["agent"])
+	}
+}
+
+// A declared mapping is the server's account of how its tool is authorized,
+// and the server is the party being authorized. It changes the PDP's
+// question; it does not get a say in what the sponsor granted.
+func TestADeclaredMappingCannotWidenTheGrant(t *testing.T) {
+	w := newWorld(t)
+	decider := &pdp{allow: true}
+	e := mappedEnforcer(t, w, decider, map[string]string{"admin.wipeAll": `{"evaluation": {
+		"action": { "name": "search.query" },
+		"resource": { "type": "tool", "id": "search.query" }
+	}}`})
+
+	_, err := e.Authorize(context.Background(), mcp.Call{Chain: w.chain(nil), Tool: "admin.wipeAll"})
+	if stage := stageOf(t, err); stage != mcp.StagePermits {
+		t.Errorf("refused at %q, want %q", stage, mcp.StagePermits)
+	}
+	if decider.asked != 0 {
+		t.Errorf("the PDP was asked %d times about a call outside the grant", decider.asked)
+	}
+}
+
+func TestAMappingErrorRefusesWithoutAskingThePDP(t *testing.T) {
+	w := newWorld(t)
+	decider := &pdp{allow: true}
+	e := mappedEnforcer(t, w, decider, map[string]string{"search.query": `{"evaluation": {
+		"subject": { "id": "$params.arguments.on_behalf_of" },
+		"action": { "name": "query" },
+		"resource": { "type": "index", "id": "public" }
+	}}`})
+
+	_, err := e.Authorize(context.Background(), mcp.Call{
+		Chain:     w.chain(nil),
+		Tool:      "search.query",
+		Arguments: map[string]any{"on_behalf_of": "u-admin"},
+	})
+	if stage := stageOf(t, err); stage != mcp.StageMapping {
+		t.Errorf("refused at %q, want %q", stage, mcp.StageMapping)
+	}
+	if decider.asked != 0 {
+		t.Errorf("the PDP was asked about a request naming a subject the chain does not")
+	}
+}
+
+const copyMapping = `{"evaluations": {
+	"evaluations": [
+		{ "action": { "name": "read" },  "resource": { "type": "object", "id": "$params.arguments.source" } },
+		{ "action": { "name": "write" }, "resource": { "type": "object", "id": "$params.arguments.destination" } }
+	]
+}}`
+
+func TestEveryEvaluationMustAllow(t *testing.T) {
+	w := newWorld(t)
+	args := map[string]any{"source": "/a", "destination": "/b"}
+
+	decider := &scripted{answers: []bool{true, true}}
+	e := mappedEnforcer(t, w, decider, map[string]string{"search.query": copyMapping})
+	got, err := e.Authorize(context.Background(), mcp.Call{Chain: w.chain(nil), Tool: "search.query", Arguments: args})
+	if err != nil {
+		t.Fatalf("expected an allow: %v", err)
+	}
+	if len(got.Decisions) != 2 || len(decider.asked) != 2 {
+		t.Errorf("got %d decisions from %d evaluations, want 2 of each", len(got.Decisions), len(decider.asked))
+	}
+
+	decider = &scripted{answers: []bool{true, false}}
+	e = mappedEnforcer(t, w, decider, map[string]string{"search.query": copyMapping})
+	_, err = e.Authorize(context.Background(), mcp.Call{Chain: w.chain(nil), Tool: "search.query", Arguments: args})
+	if stage := stageOf(t, err); stage != mcp.StagePolicy {
+		t.Errorf("refused at %q, want %q", stage, mcp.StagePolicy)
+	}
+
+	// A deny stops the rest: the call is refused either way, and asking
+	// further only tells the PDP about a call that will not happen.
+	decider = &scripted{answers: []bool{false, true}}
+	e = mappedEnforcer(t, w, decider, map[string]string{"search.query": copyMapping})
+	_, err = e.Authorize(context.Background(), mcp.Call{Chain: w.chain(nil), Tool: "search.query", Arguments: args})
+	if stage := stageOf(t, err); stage != mcp.StagePolicy {
+		t.Errorf("refused at %q, want %q", stage, mcp.StagePolicy)
+	}
+	if len(decider.asked) != 1 {
+		t.Errorf("the PDP was asked %d times after denying the first evaluation", len(decider.asked))
+	}
+}

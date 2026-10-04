@@ -84,5 +84,16 @@ jobs:
           allow-licenses: >-
             Apache-2.0, 0BSD, BSD-2-Clause, BSD-3-Clause, MIT, MIT-0, ISC,
             OpenSSL, PostgreSQL, Python-2.0, UPL-1.0, X11, Zlib
+          # These two are BSD-3-Clause plus the Go project's PATENTS file,
+          # which the scanner reports as a second license. The file is an
+          # additional patent grant from Google to users of the code, not a
+          # restriction on it, and go-licenses, which hack/check-licenses.sh
+          # runs over the whole graph, classifies both as BSD-3-Clause. The
+          # exception names the packages rather than adding the license, so
+          # anything else that ships the same file is still stopped here and
+          # looked at.
+          allow-dependencies-licenses: >-
+            pkg:golang/golang.org/x/exp,
+            pkg:golang/google.golang.org/protobuf
           comment-summary-in-pr: on-failure
           fail-on-severity: low
