@@ -1,0 +1,89 @@
+name: interop
+
+# The v0.2 gate: the enforcement point against three Policy Decision Points
+# from different projects, with no code path that knows which one it is
+# talking to. test/interop/README.md says what is run and what was found.
+on:
+  pull_request:
+    paths:
+      - "pkg/authzen/**"
+      - "pkg/mcp/**"
+      - "pkg/verify/**"
+      - "test/interop/**"
+      - ".github/workflows/interop.yml"
+      - "go.mod"
+      - "go.sum"
+  push:
+    branches: [main]
+  # The PDPs are pinned, so a weekly run catches nothing on their side; it
+  # catches the runner image changing underneath a job nobody has touched.
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: interop-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Each PDP is pinned to a release and its download checked against the
+  # digest that release publishes. Bumping one means updating both lines.
+  CERBOS_VERSION: "0.56.0"
+  CERBOS_SHA256: aefd9738a705bbd4565772b1e1122714de59a30758d5879c948f5602fb38d6e3
+  OPENFGA_VERSION: "1.21.0"
+  OPENFGA_SHA256: 0230a0f72c7bcc8ae6aeddd9dbf6d519e52934ab714b2900ce164d165b6df389
+  OPA_VERSION: "1.21.1"
+  OPA_SHA256: 668506eb17a2eaa1fce6cc0d1f42ef85125d4ac5bda5fc74d1152d0c77145031
+  # open-policy-agent/contrib publishes no release of its AuthZEN proxy, so
+  # it is pinned to a commit.
+  OPA_CONTRIB_COMMIT: 5b21e4cb42b8b3893a3ade1cf33423336c6176e1
+
+jobs:
+  interop:
+    name: three PDPs
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No job in this repository pushes, so the checkout token has no
+          # reason to outlive the step that used it.
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+
+      - name: Fetch the PDPs
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/pdp" && cd "$RUNNER_TEMP/pdp"
+
+          curl -sSfL -o cerbos.tgz \
+            "https://github.com/cerbos/cerbos/releases/download/v${CERBOS_VERSION}/cerbos_${CERBOS_VERSION}_Linux_x86_64.tar.gz"
+          echo "${CERBOS_SHA256}  cerbos.tgz" | sha256sum -c -
+          tar -xzf cerbos.tgz cerbos
+
+          curl -sSfL -o openfga.tgz \
+            "https://github.com/openfga/openfga/releases/download/v${OPENFGA_VERSION}/openfga_${OPENFGA_VERSION}_linux_amd64.tar.gz"
+          echo "${OPENFGA_SHA256}  openfga.tgz" | sha256sum -c -
+          tar -xzf openfga.tgz openfga
+
+          curl -sSfL -o opa \
+            "https://github.com/open-policy-agent/opa/releases/download/v${OPA_VERSION}/opa_linux_amd64_static"
+          echo "${OPA_SHA256}  opa" | sha256sum -c -
+          chmod +x opa
+
+          git init -q contrib
+          git -C contrib fetch -q --depth 1 https://github.com/open-policy-agent/contrib.git "$OPA_CONTRIB_COMMIT"
+          git -C contrib checkout -q FETCH_HEAD
+          (cd contrib/authzen/authzen-proxy && npm ci --no-audit --no-fund)
+
+      - name: Run the scenario against all three
+        env:
+          CERBOS: ${{ runner.temp }}/pdp/cerbos
+          OPENFGA: ${{ runner.temp }}/pdp/openfga
+          OPA: ${{ runner.temp }}/pdp/opa
+          PROXY_DIR: ${{ runner.temp }}/pdp/contrib/authzen/authzen-proxy
+        run: test/interop/run.sh

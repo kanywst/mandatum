@@ -61,7 +61,7 @@ jobs:
           # reason to outlive the step that used it.
           persist-credentials: false
       - name: shellcheck
-        run: shellcheck --severity=style hack/*.sh
+        run: shellcheck --severity=style hack/*.sh test/interop/*.sh
 
   spelling:
     name: spelling

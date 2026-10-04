@@ -18,6 +18,10 @@ Wire format: accepts `mdt.v` 1, issues `mdt.v` 1. Unchanged.
 - `FuzzDeclaredMapping`, which holds the anchoring above as an invariant over arbitrary mappings. The nightly campaign picks it up with the others.
 - The module's first dependency, CEL (`cel.dev/cel-go`). The binding has no expression-free conformance level. It is imported by `pkg/authzen` alone; the verification core still depends only on the standard library, and [the supply-chain notes](docs/security/supply-chain.md) say how to check that.
 
+- An interoperability test against three independent PDPs: Open Policy Agent through its contrib AuthZEN proxy, Cerbos, and OpenFGA. This is the v0.2 gate. One scenario, run through the enforcement point with the stock client, covers both the default and a declared mapping. Every refusal in it has to come from the PDP reading one specific field. The PDPs run from pinned, digest-checked releases on every pull request that touches the client or the enforcement point. Per PDP, only the policy file differs. [`test/interop/README.md`](test/interop/README.md) records what the run found:
+  - Cerbos and OpenFGA do not echo `X-Request-ID`, which the Authorization API requires, so the client is configured not to send one.
+  - Cerbos policies cannot read the request context, so behind Cerbos nothing can be decided by the acting agent.
+
 ### Changed
 
 - `mcp.Authorized.Decision` is now `Decisions`, one per evaluation the mapping constructed, in order. There is still exactly one unless the tool declares an `evaluations` mapping, so `Decisions[0]` is what `Decision` was.

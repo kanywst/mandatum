@@ -1,0 +1,26 @@
+{
+  "schema_version": "1.1",
+  "type_definitions": [
+    { "type": "identity" },
+    {
+      "type": "tool",
+      "relations": { "tools/call": { "this": {} } },
+      "metadata": { "relations": { "tools/call": { "directly_related_user_types": [ { "type": "identity", "condition": "vetted" } ] } } }
+    },
+    {
+      "type": "index",
+      "relations": { "query": { "this": {} } },
+      "metadata": { "relations": { "query": { "directly_related_user_types": [ { "type": "identity", "condition": "vetted" } ] } } }
+    }
+  ],
+  "conditions": {
+    "vetted": {
+      "name": "vetted",
+      "expression": "agent == 'spiffe://example.org/ns/agents/retriever' && subject_iss == 'https://idp.example.org'",
+      "parameters": {
+        "agent": { "type_name": "TYPE_NAME_STRING" },
+        "subject_iss": { "type_name": "TYPE_NAME_STRING" }
+      }
+    }
+  }
+}
