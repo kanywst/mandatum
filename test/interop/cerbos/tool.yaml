@@ -1,0 +1,20 @@
+# The interop policy for Cerbos: tools/call on search.query.
+#
+# Cerbos does not expose an evaluation request's context to policy, so the
+# context.agent condition the other policies carry cannot be written here.
+# See ../README.md.
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: default
+  resource: tool
+  rules:
+    - actions: ["tools/call"]
+      effect: EFFECT_ALLOW
+      roles: ["*"]
+      condition:
+        match:
+          all:
+            of:
+              - expr: request.principal.id == "u-8f31c02e"
+              - expr: request.principal.attr.iss == "https://idp.example.org"
+              - expr: request.resource.id == "search.query"

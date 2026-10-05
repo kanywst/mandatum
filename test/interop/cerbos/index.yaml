@@ -1,0 +1,17 @@
+# The interop policy for Cerbos: query on the public index, which is what the
+# scenario's declared mapping asks.
+apiVersion: api.cerbos.dev/v1
+resourcePolicy:
+  version: default
+  resource: index
+  rules:
+    - actions: ["query"]
+      effect: EFFECT_ALLOW
+      roles: ["*"]
+      condition:
+        match:
+          all:
+            of:
+              - expr: request.principal.id == "u-8f31c02e"
+              - expr: request.principal.attr.iss == "https://idp.example.org"
+              - expr: request.resource.id == "public"

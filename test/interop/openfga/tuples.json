@@ -1,0 +1,8 @@
+{
+  "writes": {
+    "tuple_keys": [
+      { "user": "identity:u-8f31c02e", "relation": "tools/call", "object": "tool:search.query", "condition": { "name": "vetted" } },
+      { "user": "identity:u-8f31c02e", "relation": "query", "object": "index:public", "condition": { "name": "vetted" } }
+    ]
+  }
+}

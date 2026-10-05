@@ -79,7 +79,7 @@ A declared mapping cannot override `subject.id`. The binding lets it, as a SHOUL
 
 `pkg/mcp.Enforcer.Middleware` answers every refusal with JSON-RPC error code `403` and HTTP status 403. The binding's codes are `-32602` for a mapping error, `-32001` for a denial and `-32603` for a PDP failure. The middleware's reason for its own code is recorded where the constant is defined: MCP asks that new codes for purposes it does not define be allocated outside the JSON-RPC reserved range, and the binding's `-32001` is inside it. The refusing stage, including `mapping`, is in the error's `data`.
 
-The mapping's six defined fields match field for field. That has not been checked against an interoperability suite, and the AuthZEN conformance program does not yet cover this binding. Until it does, the claim means the mapping was read from the draft and implemented field by field, with a test asserting each field, and nothing more.
+The mapping's six defined fields match field for field. The AuthZEN conformance program does not yet cover this binding. What has been run is [`test/interop`](../../test/interop/README.md): the default mapping and a declared mapping, against three independent PDPs, each deciding by the fields the mapping produced. That shows PDPs read the request as intended, not that the mapping matches the binding, which is still the claim below. Until it does, the claim means the mapping was read from the draft and implemented field by field, with a test asserting each field, and nothing more.
 
 ## How to check
 
