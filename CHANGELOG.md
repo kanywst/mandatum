@@ -6,7 +6,21 @@ Each release also records which Delegation Assertion format versions (`mdt.v`) i
 
 ## [Unreleased]
 
-Wire format: accepts `mdt.v` 1, issues `mdt.v` 1. Unchanged.
+Nothing yet.
+
+## [0.2.0] - 2026-10-06
+
+The AuthZEN and MCP binding release. A tool's declared mapping now decides what the Policy Decision Point is asked, and the enforcement point has been run against three PDPs that somebody else wrote. Those were the last two v0.2 items in [ROADMAP.md](ROADMAP.md).
+
+Wire format: accepts `mdt.v` 1, issues `mdt.v` 1. Unchanged from 0.1.0.
+
+This is a 0.x minor release, so the Go API may change, and it does in one place: `mcp.Authorized.Decision` became `Decisions`, under Changed below.
+
+### The gate, and how it was met
+
+- **Works against three PDPs from different vendors with no implementation-specific code paths.** The PDPs are Open Policy Agent through its contrib AuthZEN proxy, Cerbos, and OpenFGA. All three are on the AuthZEN working group's interop list, none shares code with this project, and the `interop` workflow runs them from pinned, digest-checked releases. The client and the enforcement point have no code that knows which PDP they are talking to. The per-PDP differences are a policy file each and one client option that already existed, and [`test/interop/README.md`](test/interop/README.md) says why each is there.
+
+Not a gate for this version, but held to anyway: the new fuzz target, `FuzzDeclaredMapping`, accumulated twenty-five hours with no crasher before the tag, about 810 million executions, over the code this tag names. The commits between the one fuzzed, `4338a42`, and the tag change only documentation. That is the same bar v0.1 set for the targets it shipped, met the same way, as five concurrent campaigns. The mapping resolver parses input written by the server being authorized, and shipping it with minutes of fuzzing would not have matched how the parsers before it were treated.
 
 ### Added
 
@@ -17,7 +31,6 @@ Wire format: accepts `mdt.v` 1, issues `mdt.v` 1. Unchanged.
 - Bounds on a mapping's expressions, which are written by the server being authorized and run on every call to its tool: a CEL cost limit, `authzen.MaxExpressionCost`, and a separate bound on what they produce for one call, `authzen.MaxResolvedValues` and `authzen.MaxResolvedBytes`. The second exists because the first does not cover it — CEL charges for referencing a list, not for its length, so an expression mapping one argument's list onto another's evaluated well under the cost limit while allocating tens of gigabytes. Found in review before merge; `TestAnAmplifyingExpressionIsStopped` is the case.
 - `FuzzDeclaredMapping`, which holds the anchoring above as an invariant over arbitrary mappings. The nightly campaign picks it up with the others.
 - The module's first dependency, CEL (`cel.dev/cel-go`). The binding has no expression-free conformance level. It is imported by `pkg/authzen` alone; the verification core still depends only on the standard library, and [the supply-chain notes](docs/security/supply-chain.md) say how to check that.
-
 - An interoperability test against three independent PDPs: Open Policy Agent through its contrib AuthZEN proxy, Cerbos, and OpenFGA. This is the v0.2 gate. One scenario, run through the enforcement point with the stock client, covers both the default and a declared mapping. Every refusal in it has to come from the PDP reading one specific field. The PDPs run from pinned, digest-checked releases on every pull request that touches the client or the enforcement point. Per PDP, only the policy file differs. [`test/interop/README.md`](test/interop/README.md) records what the run found:
   - Cerbos and OpenFGA do not echo `X-Request-ID`, which the Authorization API requires, so the client is configured not to send one.
   - Cerbos policies cannot read the request context, so behind Cerbos nothing can be decided by the acting agent.
@@ -26,6 +39,15 @@ Wire format: accepts `mdt.v` 1, issues `mdt.v` 1. Unchanged.
 
 - `mcp.Authorized.Decision` is now `Decisions`, one per evaluation the mapping constructed, in order. There is still exactly one unless the tool declares an `evaluations` mapping, so `Decisions[0]` is what `Decision` was.
 - The conformance notes record a divergence that was there before this change and was not written down: the middleware answers every refusal with code `403`, where the binding specifies `-32602`, `-32001` and `-32603` by kind.
+
+### Known limitations
+
+What 0.1.0 listed and this release does not fix still stands: no audit log, an in-process sequence store only, nothing publishing a revocation set on a schedule, no third-party security review, and rule V7 unreachable through the public API. Two of its limitations are gone, declared mappings and an untested PDP binding. What changed or is new:
+
+- **Only `tools/call` is mapped to AuthZEN.** Declared mappings now apply to it. Every other MCP method is still forwarded unexamined, which diverges from the binding's deny-by-default over unmapped methods. The middleware does not learn mappings from `tools/list` responses, so a deployment supplies them through its catalog. See [`docs/spec/coaz-mcp-conformance.md`](docs/spec/coaz-mcp-conformance.md).
+- **Two of the three tested PDPs need request correlation switched off.** Cerbos and OpenFGA do not echo `X-Request-ID`, and the client refuses an answer it cannot tie to its question. Against them, `authzen.WithRequestID(func() string { return "" })` is required, and the PEP and PDP logs then cannot be joined on a request identifier.
+- **Behind Cerbos, nothing can be decided by the acting agent.** Cerbos policies cannot read the evaluation context, which is where `context.agent` and the verified chain go. A declared mapping can project the agent into subject or resource properties, where Cerbos can read it. The default mapping does not do that.
+- **Refusals carry code `403`, not the binding's codes.** The binding specifies `-32602`, `-32001` and `-32603` by kind. The middleware's reason is recorded where the constant is defined.
 
 ## [0.1.0] - 2026-09-18
 
@@ -142,7 +164,8 @@ Wire format: accepts `mdt.v` 1, issues `mdt.v` 1.
 - No audit log.
 - Rule V7 is not reachable through the public API. V5 and the structural `max_depth` invariant reject anything that would violate it first. It is retained as defence in depth and tested directly.
 
-[Unreleased]: https://github.com/kanywst/mandatum/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/kanywst/mandatum/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/kanywst/mandatum/releases/tag/v0.2.0
 [0.1.0]: https://github.com/kanywst/mandatum/releases/tag/v0.1.0
 [0.1.0-rc.2]: https://github.com/kanywst/mandatum/tree/c4fc3d26a5e41990c04bb939a5a25d24651e88ac
 [0.1.0-rc.1]: https://github.com/kanywst/mandatum/releases/tag/v0.1.0-rc.1
