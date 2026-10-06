@@ -47,7 +47,7 @@ The verifier is the security core. It ships first, alone, so that it can be revi
 
 Gates: every specification rule has a corresponding negative test; the threat model is published; and each fuzz target has accumulated at least 24 hours with no crasher. Cumulative, because a single run cannot: a GitHub Actions job is capped at six hours, so the gate is met by the nightly campaign plus long `workflow_dispatch` runs before the tag, and the total is recorded in the release notes rather than asserted here. All three were met at v0.1.0, with the hours and the shape of them in [CHANGELOG.md](CHANGELOG.md).
 
-### v0.2 — AuthZEN and MCP binding (2027 Q1)
+### v0.2 — AuthZEN and MCP binding (2027 Q1) — shipped 2026-10-06
 
 - ~~AuthZEN Authorization API 1.0 client~~ done
 - ~~Mapping from a verified chain to an evaluation request~~ done
