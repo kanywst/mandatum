@@ -1,5 +1,8 @@
 # Mandatum
 
+> [!IMPORTANT]
+> **アーカイブ済み。** Mandatum の開発は終了した。v0.2.0 のリファレンス検証器は、委譲チェーンを表示するターミナルビューア [whosent](https://github.com/kanywst/whosent) (Mandatum、Biscuit、JWT `act` に対応) の中に引き継がれている。このリポジトリのコードと仕様は v0.2.0 のまま読める。
+
 [English](README.md) | **日本語**
 
 > この文書は翻訳です。**英語版が正典**であり、内容が食い違う場合は [README.md](README.md) が正しいものとします。翻訳方針は [docs/i18n.md](docs/i18n.md) を参照してください。
