@@ -4,9 +4,12 @@
 
 **English** | [日本語](README.ja.md)
 
+> [!IMPORTANT]
+> **Archived.** Mandatum is no longer developed. Its v0.2.0 reference verifier lives on inside [whosent](https://github.com/kanywst/whosent), a terminal viewer for delegation chains (Mandatum, Biscuit and JWT `act`). The code and specification here stay readable at v0.2.0.
+
 **Verifiable delegation for AI agents.** An agent's authority to act becomes a signed chain rooted in a named human — attenuating at every hop, revocable at any link, and evaluated across whole action sequences.
 
-> **Status: early.** The format, the verifier, the signing layer and the issuer work end to end and are tested against real signatures. The AuthZEN binding and sequence evaluation work too, as do key resolution from an issuer's JWKS or SPIFFE bundle, local revocation from a published compact set, and an MCP tool-call enforcement middleware that runs the four checks in the order the specification requires. The audit log is not built, the sequence store is in-process only, nothing publishes a revocation set on a schedule, and nothing here has had a third-party security review. See [ROADMAP.md](ROADMAP.md) and the [threat model](docs/security/threat-model.md) for what that means in practice.
+> **Status when archived (v0.2.0).** The format, the verifier, the signing layer and the issuer work end to end and are tested against real signatures. The AuthZEN binding and sequence evaluation work too, as do key resolution from an issuer's JWKS or SPIFFE bundle, local revocation from a published compact set, and an MCP tool-call enforcement middleware that runs the four checks in the order the specification requires. The audit log is not built, the sequence store is in-process only, nothing publishes a revocation set on a schedule, and nothing here has had a third-party security review. None of that will change now. [ROADMAP.md](ROADMAP.md) records what was planned, and the [threat model](docs/security/threat-model.md) what that means in practice.
 >
 > The specification is the thing to read and argue with: [`docs/spec/delegation-assertion.md`](docs/spec/delegation-assertion.md).
 

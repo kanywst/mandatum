@@ -1,5 +1,8 @@
 # Roadmap
 
+> [!IMPORTANT]
+> **Archived.** Mandatum stopped at v0.2.0 and this roadmap will not be pursued. It is kept as a record of what was planned. Nothing below is in progress, and no further release will ship.
+
 Last reconciled with the implementation: 2026-10-05.
 
 That date is a claim about when every Status below was last checked against the code, which is the thing a reader needs and the thing that can go stale silently. It is not a record of when this file was last edited: `git log ROADMAP.md` already holds that, and the line this replaces tried to be both — it said 2026-09-13 through two later commits that changed the gates it sits above.
