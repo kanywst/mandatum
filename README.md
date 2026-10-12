@@ -5,7 +5,7 @@
 **English** | [日本語](README.ja.md)
 
 > [!IMPORTANT]
-> **Archived.** Mandatum is no longer developed. Its v0.2.0 reference verifier lives on inside [whosent](https://github.com/kanywst/whosent), a terminal viewer for delegation chains (Mandatum, Biscuit and JWT `act`). The code and specification here stay readable at v0.2.0.
+> **Archived.** Mandatum is no longer developed. The code and specification stay readable at v0.2.0.
 
 **Verifiable delegation for AI agents.** An agent's authority to act becomes a signed chain rooted in a named human — attenuating at every hop, revocable at any link, and evaluated across whole action sequences.
 
